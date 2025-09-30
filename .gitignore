@@ -1,0 +1,25 @@
+*.iml
+.gradle
+.DS_Store
+build
+captures
+.externalNativeBuild
+.cxx
+local.properties
+xcuserdata
+.kotlin
+#So we don't accidentally commit our private keys
+*.gpg
+**/.gradle/
+**/local.properties
+.idea/*
+!.idea/copyright/
+!.idea/ktfmt.xml
+
+**/build/
+/captures/
+**/*.jks
+**/*.keystore
+*.hprof
+
+**/.kotlin
