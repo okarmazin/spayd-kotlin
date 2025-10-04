@@ -9,10 +9,11 @@ plugins {
     alias(libs.plugins.vanniktech.mavenPublish)
 }
 
-group = "cz.multiplatform.spayd"
-version = "1.0.0"
+group = "tools.kmp.spayd"
+version = "0.0.1"
 
 kotlin {
+    explicitApi()
     jvm()
     androidTarget {
         publishLibraryVariants("release")
@@ -41,7 +42,7 @@ kotlin {
 }
 
 android {
-    namespace = "cz.multiplatform.spayd"
+    namespace = "tools.kmp.spayd"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package cz.multiplatform.spayd
+package tools.kmp.spayd
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
