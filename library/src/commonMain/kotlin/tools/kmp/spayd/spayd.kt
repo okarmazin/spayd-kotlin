@@ -376,7 +376,7 @@ public value class NotificationAddress private constructor(public val value: Str
 
         @JvmStatic
         fun fromString(value: String): NotificationAddress {
-            require(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
+            require(value.length in 1..MAX_LENGTH) { "NTA: Notification address must be 1 to $MAX_LENGTH characters long." }
             return NotificationAddress(value)
         }
     }
