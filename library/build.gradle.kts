@@ -9,7 +9,7 @@ plugins {
     alias(libs.plugins.vanniktech.mavenPublish)
 }
 
-group = "tools.kmp.spayd"
+group = "tools.kmp"
 version = "0.0.1"
 
 kotlin {
@@ -61,28 +61,28 @@ mavenPublishing {
     coordinates(group.toString(), "spayd", version.toString())
 
     pom {
-        name = "My library"
-        description = "A library."
-        inceptionYear = "2024"
-        url = "https://github.com/kotlin/multiplatform-library-template/"
+        name = "QR Platba"
+        description = "Zero-dependency SPAYD (Short Payment Descriptor) library for Kotlin Multiplatform. https://qr-platba.cz/"
+        inceptionYear = "2025"
+        url.set("https://github.com/okarmazin/spayd")
         licenses {
             license {
-                name = "XXX"
-                url = "YYY"
-                distribution = "ZZZ"
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
             }
         }
         developers {
             developer {
-                id = "XXX"
-                name = "YYY"
-                url = "ZZZ"
+                id.set("okarmazin")
+                name.set("Ondřej Karmazín")
+                url.set("https://github.com/okarmazin")
             }
         }
         scm {
-            url = "XXX"
-            connection = "YYY"
-            developerConnection = "ZZZ"
+            connection.set("scm:git:git://github.com/okarmazin/spayd.git")
+            developerConnection.set("scm:git:git://github.com/okarmazin/spayd.git")
+            url.set("https://github.com/okarmazin/spayd")
         }
     }
 }
