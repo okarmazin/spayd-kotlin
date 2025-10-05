@@ -15,6 +15,8 @@ public data class SPAYD internal constructor(
     val amount: Amount?,
     /** CC */
     val currency: Currency?,
+    /** CRC32 */
+    val crc32: CRC32?,
     /** DT: Datum splatnosti */
     val dueDate: LocalDate?,
     /** MSG */
@@ -442,6 +444,23 @@ public value class URL private constructor(public val value: String) {
     }
 }
 
+@JvmInline
+public value class CRC32 private constructor(public val value: String) {
+    internal companion object {
+        val LENGTH: Int = 8
+        val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
+
+        @JvmStatic
+        fun fromString(value: String): CRC32 {
+            require(value.length == LENGTH && value.all { it in hexDigits }) {
+                "CRC32: CRC32 must be exactly $LENGTH hexadecimal digits."
+            }
+
+            return CRC32(value)
+        }
+    }
+}
+
 @Throws(IllegalArgumentException::class)
 private fun parseSpayd(spayd: String): SPAYD {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
@@ -459,6 +478,7 @@ private fun parseSpayd(spayd: String): SPAYD {
     var altAccs: List<IbanBic> = emptyList()
     var amount: Amount? = null
     var currency: Currency? = null
+    var crc32: CRC32? = null
     var dueDate: LocalDate? = null
     var message: Message? = null
     var notificationType: NotificationType? = null
@@ -488,7 +508,7 @@ private fun parseSpayd(spayd: String): SPAYD {
             "ALT-ACC" -> altAccs = parseAltAcc(value)
             "AM" -> amount = Amount.fromString(value)
             "CC" -> currency = Currency.fromString(value)
-            "CRC32" -> {}
+            "CRC32" -> crc32 = CRC32.fromString(value)
             "DT" -> dueDate = LocalDate.fromString(value)
             "MSG" -> message = Message.fromString(value)
             "NT" -> notificationType = parseNotificationType(value)
@@ -513,6 +533,7 @@ private fun parseSpayd(spayd: String): SPAYD {
         altAccounts = altAccs,
         amount = amount,
         currency = currency,
+        crc32 = crc32,
         dueDate = dueDate,
         message = message,
         notificationType = notificationType,
