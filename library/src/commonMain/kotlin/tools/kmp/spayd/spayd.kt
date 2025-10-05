@@ -15,7 +15,7 @@ public data class SPAYD internal constructor(
     val amount: Amount?,
     /** CC */
     val currency: Currency?,
-    /** DT */
+    /** DT: Datum splatnosti */
     val dueDate: LocalDate?,
     /** MSG */
     val message: Message?,
@@ -28,7 +28,7 @@ public data class SPAYD internal constructor(
     /** RF */
     val senderReference: SenderReference?,
     /** RN */
-    val recipient: String?,
+    val recipient: Recipient?,
 
     /** X-VS */
     val vs: CzPaymentSymbol?,
@@ -37,11 +37,11 @@ public data class SPAYD internal constructor(
     /** X-KS */
     val ks: CzPaymentSymbol?,
     /** X-PER */
-    val retryDays: Int?,
+    val retryDays: CzRetryDays?,
     /** X-ID */
     val paymentId: CzPaymentId?,
     /** X-URL */
-    val url: String?,
+    val url: URL?,
 
     val customAttributes: Map<String, String>,
 ) {
@@ -361,6 +361,19 @@ public value class CzPaymentId private constructor(public val value: String) {
     }
 }
 
+@JvmInline
+public value class CzRetryDays private constructor(public val value: Int) {
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): CzRetryDays {
+            require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
+                "X-PER: Retry days must be a number from 1 to 30"
+            }
+            return CzRetryDays(value.toInt())
+        }
+    }
+}
+
 public enum class NotificationType {
     /** NT:P */
     PHONE,
@@ -376,7 +389,7 @@ public value class NotificationAddress private constructor(public val value: Str
 
         @JvmStatic
         fun fromString(value: String): NotificationAddress {
-            require(value.length in 1..MAX_LENGTH) { "NTA: Notification address must be 1 to $MAX_LENGTH characters long." }
+            require(value.length <= MAX_LENGTH) { "NTA: Notification address must be at most $MAX_LENGTH characters long." }
             return NotificationAddress(value)
         }
     }
@@ -404,6 +417,31 @@ public sealed class PaymentType {
     }
 }
 
+@JvmInline
+public value class Recipient private constructor(public val value: String) {
+    internal companion object {
+        val MAX_LENGTH: Int = 35
+
+        fun fromString(value: String): Recipient {
+            require(value.length <= MAX_LENGTH) { "RN: Recipient must be at most $MAX_LENGTH characters long." }
+            return Recipient(value)
+        }
+    }
+}
+
+@JvmInline
+public value class URL private constructor(public val value: String) {
+    internal companion object {
+        val MAX_LENGTH: Int = 140
+
+        @JvmStatic
+        fun fromString(value: String): URL {
+            require(value.length <= MAX_LENGTH) { "X-URL: URL must be at most $MAX_LENGTH characters long." }
+            return URL(value)
+        }
+    }
+}
+
 @Throws(IllegalArgumentException::class)
 private fun parseSpayd(spayd: String): SPAYD {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
@@ -427,13 +465,13 @@ private fun parseSpayd(spayd: String): SPAYD {
     var notificationAddress: NotificationAddress? = null
     var paymentType: PaymentType? = null
     var senderReference: SenderReference? = null
-    var recipient: String? = null
+    var recipient: Recipient? = null
     var vs: CzPaymentSymbol? = null
     var ss: CzPaymentSymbol? = null
     var ks: CzPaymentSymbol? = null
-    var retryDays: Int? = null
+    var retryDays: CzRetryDays? = null
     var paymentId: CzPaymentId? = null
-    var url: String? = null
+    var url: URL? = null
 
     val customAttrs = mutableMapOf<String, String>()
 
@@ -457,14 +495,14 @@ private fun parseSpayd(spayd: String): SPAYD {
             "NTA" -> notificationAddress = NotificationAddress.fromString(value)
             "PT" -> paymentType = PaymentType.fromString(value)
             "RF" -> senderReference = SenderReference.fromString(value)
-            "RN" -> recipient = parseRecipient(value)
+            "RN" -> recipient = Recipient.fromString(value)
             // Czech extension attrs
             "X-VS" -> vs = CzPaymentSymbol.fromString(value)
             "X-SS" -> ss = CzPaymentSymbol.fromString(value)
             "X-KS" -> ks = CzPaymentSymbol.fromString(value) // Az 10 symbolu pro jednoduchost, realne max 4 cislice
-            "X-PER" -> retryDays = parseRetryDays(value)
+            "X-PER" -> retryDays = CzRetryDays.fromString(value)
             "X-ID" -> paymentId = CzPaymentId.fromString(value)
-            "X-URL" -> url = parseUrl(value)
+            "X-URL" -> url = URL.fromString(value)
             // Unknown custom attributes
             else -> customAttrs[key] = value
         }
@@ -523,23 +561,6 @@ private fun parseNotificationType(value: String): NotificationType {
         "E" -> NotificationType.EMAIL
         else -> throw IllegalArgumentException("NT: Invalid notification type. Must be one of [P, E]")
     }
-}
-
-private fun parseRecipient(value: String): String {
-    require(value.length in 1..35) { "RN: Recipient must be 1..35 characters long." }
-    return value
-}
-
-private fun parseRetryDays(value: String): Int {
-    require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
-        "X-PER: Retry days must be a number from 1 to 30"
-    }
-    return value.toInt()
-}
-
-private fun parseUrl(value: String): String {
-    require(value.length in 1..140) { "X-URL: URL must be 1..140 characters long." }
-    return value
 }
 
 @Suppress("NOTHING_TO_INLINE")
