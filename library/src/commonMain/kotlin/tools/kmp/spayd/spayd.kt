@@ -506,7 +506,7 @@ public value class VS private constructor(public val value: String) : SpaydAttri
     internal companion object {
         @JvmStatic
         fun fromString(value: String): VS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "VS must be 1 to 10 digits." }
+            require(value.length in 1..10 && isAsciiDigits(value)) { "X-VS: VS must be 1 to 10 digits." }
             return VS(value)
         }
     }
@@ -521,7 +521,7 @@ public value class SS private constructor(public val value: String) : SpaydAttri
     internal companion object {
         @JvmStatic
         fun fromString(value: String): SS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "SS must be 1 to 10 digits." }
+            require(value.length in 1..10 && isAsciiDigits(value)) { "X-SS: SS must be 1 to 10 digits." }
             return SS(value)
         }
     }
@@ -536,7 +536,7 @@ public value class KS private constructor(public val value: String) : SpaydAttri
     internal companion object {
         @JvmStatic
         fun fromString(value: String): KS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "KS must be 1 to 10 digits." }
+            require(value.length in 1..10 && isAsciiDigits(value)) { "X-KS: KS must be 1 to 10 digits." }
             return KS(value)
         }
     }

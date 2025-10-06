@@ -29,9 +29,7 @@ kotlin {
 
     sourceSets {
         val commonMain by getting {
-            dependencies {
-                //put your multiplatform dependencies here
-            }
+            dependencies {}
         }
         val commonTest by getting {
             dependencies {
@@ -62,9 +60,10 @@ mavenPublishing {
 
     pom {
         name = "QR Platba"
-        description = "Zero-dependency SPAYD (Short Payment Descriptor) library for Kotlin Multiplatform. https://qr-platba.cz/"
+        description =
+            "Zero-dependency SPAYD (Short Payment Descriptor) library for Kotlin Multiplatform. https://qr-platba.cz/"
         inceptionYear = "2025"
-        url.set("https://github.com/okarmazin/spayd")
+        url.set("https://github.com/okarmazin/spayd-kotlin")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")
@@ -80,9 +79,9 @@ mavenPublishing {
             }
         }
         scm {
-            connection.set("scm:git:git://github.com/okarmazin/spayd.git")
-            developerConnection.set("scm:git:git://github.com/okarmazin/spayd.git")
-            url.set("https://github.com/okarmazin/spayd")
+            connection.set("scm:git:git://github.com/okarmazin/spayd-kotlin.git")
+            developerConnection.set("scm:git:git://github.com/okarmazin/spayd-kotlin.git")
+            url.set("https://github.com/okarmazin/spayd-kotlin")
         }
     }
 }

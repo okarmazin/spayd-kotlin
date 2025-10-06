@@ -213,5 +213,4 @@ class SpaydTest {
         assertEquals(expectedOptimized, spayd.encodeToString(true))
     }
 
-
 }
