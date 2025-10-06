@@ -8,9 +8,9 @@ import kotlin.jvm.JvmStatic
 @ConsistentCopyVisibility
 public data class SPAYD internal constructor(
     /** ACC: Account, the only required attribute */
-    val account: IbanBic,
+    val account: Account,
     /** ALT-ACC */
-    val altAccounts: List<IbanBic>,
+    val altAccounts: AltAccounts?,
     /** AM */
     val amount: Amount?,
     /** CC */
@@ -18,7 +18,7 @@ public data class SPAYD internal constructor(
     /** CRC32 */
     val crc32: CRC32?,
     /** DT: Datum splatnosti */
-    val dueDate: LocalDate?,
+    val dueDate: DueDate?,
     /** MSG */
     val message: Message?,
     /** NT */
@@ -33,11 +33,11 @@ public data class SPAYD internal constructor(
     val recipient: Recipient?,
 
     /** X-VS */
-    val vs: CzPaymentSymbol?,
+    val vs: VS?,
     /** X-SS */
-    val ss: CzPaymentSymbol?,
+    val ss: SS?,
     /** X-KS */
-    val ks: CzPaymentSymbol?,
+    val ks: KS?,
     /** X-PER */
     val retryDays: CzRetryDays?,
     /** X-ID */
@@ -45,12 +45,147 @@ public data class SPAYD internal constructor(
     /** X-URL */
     val url: URL?,
 
-    val customAttributes: Map<String, String>,
+    val customAttributes: List<CustomAttribute>,
 ) {
+    public fun encodeToString(optimizeForQr: Boolean): String = encode(this, optimizeForQr)
+
     public companion object {
         @Throws(IllegalArgumentException::class)
         @JvmStatic
-        public fun parse(spaydString: String): SPAYD = parseSpayd(spaydString)
+        public fun decodeFromString(spaydString: String): SPAYD = decode(spaydString)
+    }
+}
+
+internal interface SpaydAttribute {
+    val key: String
+    fun encodedValue(optimizeForQr: Boolean = true): String
+}
+
+@JvmInline
+public value class Account(public val value: IbanBic) : SpaydAttribute {
+    override val key: String get() = "ACC"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value.encodedValue()
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): Account = Account(IbanBic.fromString(value))
+    }
+}
+
+@JvmInline
+public value class AltAccounts(public val accounts: List<IbanBic>) : SpaydAttribute {
+    override val key: String get() = "ALT-ACC"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = accounts.joinToString(",") { it.encodedValue() }
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): AltAccounts = try {
+            AltAccounts(value.split(',').map(IbanBic::fromString))
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Cannot parse ALT-ACC: ${e.message}", e)
+        }
+    }
+}
+
+public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
+    internal fun encodedValue(): String {
+        val content = iban.value + (bic?.value?.let { "+$it" } ?: "")
+        return spaydPercentEncode(content, true)
+    }
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): IbanBic {
+            val parts = value.split('+', limit = 2)
+            val iban = parts[0]
+            val bic = parts.getOrNull(1)
+            return IbanBic(IBAN.fromString(iban), bic?.let(BIC::fromString))
+        }
+
+        internal fun fromParts(iban: IBAN, bic: BIC? = null): IbanBic = IbanBic(iban, bic)
+    }
+}
+
+@ConsistentCopyVisibility
+public data class IBAN private constructor(val value: String) {
+    override fun toString(): String = value
+
+    public fun readable(): String = value.chunked(4).joinToString(" ")
+
+    internal companion object {
+        const val MIN_LENGTH = 16
+        const val MAX_LENGTH = 34
+
+        @JvmStatic
+        @Throws(IllegalArgumentException::class)
+        fun fromString(string: String): IBAN {
+            val string = string.filterNot { it.isWhitespace() }
+            require(string.length in MIN_LENGTH..MAX_LENGTH) {
+                "IBAN length (${string.length}) is not in the allowed range $MIN_LENGTH..$MAX_LENGTH."
+            }
+            require(string.take(2).all { it in 'A'..'Z' }) { "Invalid country code." }
+            require(string.drop(2).take(2).all { it in '0'..'9' }) { "Invalid check digits." }
+
+            val rearrangedDigits = buildString {
+                for (c in string.drop(4) + string.take(4)) {
+                    if (c.isDigit()) {
+                        append(c.toString())
+                    } else {
+                        append((c.code - 'A'.code + 10).toString())
+                    }
+                }
+            }
+
+            require(mod97(rearrangedDigits) == 1) { "Invalid IBAN: did not pass mod97 check." }
+
+            return IBAN(string)
+        }
+
+        fun from(czBankAccount: CZBankAccount): IBAN {
+            val bankCode = czBankAccount.bankCode.value
+            val prefix = czBankAccount.accountNumber.prefix.padStart(6, '0')
+            val account = czBankAccount.accountNumber.accountNumber.padStart(10, '0')
+            // 123500 = CZ00
+            val rearrangedDigits = "$bankCode$prefix${account}123500"
+            val checkNum = 98 - mod97(rearrangedDigits)
+            val checkDigits = checkNum.toString().padStart(2, '0')
+            return IBAN("CZ$checkDigits$bankCode$prefix$account")
+        }
+
+        private fun mod97(digits: String): Int {
+            var remainder = 0
+            for (char in digits) {
+                val digit = char - '0'
+                remainder = (remainder * 10 + digit) % 97
+            }
+
+            return remainder
+        }
+    }
+}
+
+@ConsistentCopyVisibility
+public data class BIC private constructor(val value: String) {
+    override fun toString(): String = value
+
+    internal companion object {
+
+        @JvmStatic
+        @Throws(IllegalArgumentException::class)
+        fun fromString(string: String): BIC {
+            // From Wikipedia:
+            // 4 letters, 2 letters, 2 alphanum, 3 alphanum (optional)
+            require(string.length == 8 || string.length == 11) {
+                "BIC must be 8 OR 11 characters long, was ${string.length}."
+            }
+            val letters = string.take(6)
+            val alphanum = string.drop(6)
+            require(letters.all { it in 'A'..'Z' }) { "BIC must start with 6 uppercase letters." }
+            require(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) { "BIC must end with 2 or 5 alphanumeric characters." }
+            return BIC(string)
+        }
     }
 }
 
@@ -148,180 +283,12 @@ public data class BankCode private constructor(val value: String) {
     }
 }
 
-@ConsistentCopyVisibility
-public data class IBAN private constructor(val value: String) {
-    override fun toString(): String = value
-
-    public fun readable(): String = value.chunked(4).joinToString(" ")
-
-    internal companion object {
-        const val MIN_LENGTH = 16
-        const val MAX_LENGTH = 34
-
-        @JvmStatic
-        @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): IBAN {
-            val string = string.filterNot { it.isWhitespace() }
-            require(string.length in MIN_LENGTH..MAX_LENGTH) {
-                "IBAN length (${string.length}) is not in the allowed range $MIN_LENGTH..$MAX_LENGTH."
-            }
-            require(string.take(2).all { it in 'A'..'Z' }) { "Invalid country code." }
-            require(string.drop(2).take(2).all { it in '0'..'9' }) { "Invalid check digits." }
-
-            val rearrangedDigits = buildString {
-                for (c in string.drop(4) + string.take(4)) {
-                    if (c.isDigit()) {
-                        append(c.toString())
-                    } else {
-                        append((c.code - 'A'.code + 10).toString())
-                    }
-                }
-            }
-
-            require(mod97(rearrangedDigits) == 1) { "Invalid IBAN: did not pass mod97 check." }
-
-            return IBAN(string)
-        }
-
-        fun from(czBankAccount: CZBankAccount): IBAN {
-            val bankCode = czBankAccount.bankCode.value
-            val prefix = czBankAccount.accountNumber.prefix.padStart(6, '0')
-            val account = czBankAccount.accountNumber.accountNumber.padStart(10, '0')
-            // 123500 = CZ00
-            val rearrangedDigits = "$bankCode$prefix${account}123500"
-            val checkNum = 98 - mod97(rearrangedDigits)
-            val checkDigits = checkNum.toString().padStart(2, '0')
-            return IBAN("CZ$checkDigits$bankCode$prefix$account")
-        }
-
-        private fun mod97(digits: String): Int {
-            var remainder = 0
-            for (char in digits) {
-                val digit = char - '0'
-                remainder = (remainder * 10 + digit) % 97
-            }
-
-            return remainder
-        }
-    }
-}
-
-@ConsistentCopyVisibility
-public data class BIC private constructor(val value: String) {
-    override fun toString(): String = value
-
-    internal companion object {
-
-        @JvmStatic
-        @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): BIC {
-            // From Wikipedia:
-            // 4 letters, 2 letters, 2 alphanum, 3 alphanum (optional)
-            require(string.length == 8 || string.length == 11) {
-                "BIC must be 8 OR 11 characters long, was ${string.length}."
-            }
-            val letters = string.take(6)
-            val alphanum = string.drop(6)
-            require(letters.all { it in 'A'..'Z' }) { "BIC must start with 6 uppercase letters." }
-            require(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) { "BIC must end with 2 or 5 alphanumeric characters." }
-            return BIC(string)
-        }
-    }
-}
-
-@ConsistentCopyVisibility
-public data class LocalDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
-    /**
-     * ISO 8601 format: YYYY-MM-DD
-     */
-    override fun toString(): String =
-        "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
-
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): LocalDate {
-            require(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
-            val year = value.take(4).toInt()
-            val month = value.drop(4).take(2).toInt()
-            val day = value.takeLast(2).toInt()
-            require(year >= 1900) { "Unreasonable year: $year." }
-            require(month in 1..12) { "Month number must be between 1 and 12." }
-            require(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
-            return LocalDate(
-                year = year,
-                monthNumber = month,
-                dayOfMonth = day,
-            )
-        }
-
-        private fun daysInMonth(year: Int, monthNumber: Int): Int = when (monthNumber) {
-            1, 3, 5, 7, 8, 10, 12 -> 31
-            4, 6, 9, 11 -> 30
-            2 -> if (isLeapYear(year)) 29 else 28
-            else -> throw IllegalArgumentException("Invalid month number: $monthNumber")
-        }
-
-        private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
-    }
-}
-
-@ConsistentCopyVisibility
-public data class IbanBic private constructor(val iban: IBAN, val bic: BIC? = null) {
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): IbanBic {
-            val parts = value.split('+', limit = 2)
-            val iban = parts[0]
-            val bic = parts.getOrNull(1)
-            return IbanBic(IBAN.fromString(iban), bic?.let(BIC::fromString))
-        }
-
-        fun fromParts(iban: IBAN, bic: BIC? = null) = IbanBic(iban, bic)
-    }
-}
-
-/**
- * Variabilní nebo specifický symbol
- */
 @JvmInline
-public value class CzPaymentSymbol private constructor(public val value: String) {
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): CzPaymentSymbol {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "VS and SS must be 1 to 10 digits." }
-            return CzPaymentSymbol(value)
-        }
-    }
-}
+public value class Amount private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "AM"
 
-@JvmInline
-public value class Message private constructor(public val value: String) {
-    internal companion object {
-        val MAX_LENGTH: Int = 60
+    override fun encodedValue(optimizeForQr: Boolean): String = value
 
-        @JvmStatic
-        fun fromString(value: String): Message {
-            require(value.length <= MAX_LENGTH) { "MSG: Message must not exceed $MAX_LENGTH characters." }
-            return Message(value)
-        }
-    }
-}
-
-@JvmInline
-public value class Currency(public val code: String) {
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): Currency {
-            require(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
-                "CC: Currency code must be exactly 3 letters."
-            }
-            return Currency(value)
-        }
-    }
-}
-
-@JvmInline
-public value class Amount private constructor(public val value: String) {
     internal companion object {
         @JvmStatic
         fun fromString(value: String): Amount {
@@ -340,52 +307,123 @@ public value class Amount private constructor(public val value: String) {
 }
 
 @JvmInline
-public value class SenderReference private constructor(public val value: String) {
+public value class Currency private constructor(public val code: String) : SpaydAttribute {
+    override val key: String get() = "CC"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = code.uppercase()
+
     internal companion object {
         @JvmStatic
-        fun fromString(value: String): SenderReference {
-            require(value.length in 1..16 && isAsciiDigits(value)) {
-                "RF: Sender reference must be a string of digits from 1 to 16 characters long."
+        fun fromString(value: String): Currency {
+            require(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
+                "CC: Currency code must be exactly 3 letters."
             }
-            return SenderReference(value)
+            return Currency(value)
         }
     }
 }
 
 @JvmInline
-public value class CzPaymentId private constructor(public val value: String) {
+public value class CRC32 private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "CRC32"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value.uppercase()
+
     internal companion object {
+        val LENGTH: Int = 8
+        val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
+
         @JvmStatic
-        fun fromString(value: String): CzPaymentId {
-            require(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
-            return CzPaymentId(value)
+        fun fromString(value: String): CRC32 {
+            require(value.length == LENGTH && value.all { it in hexDigits }) {
+                "CRC32: CRC32 must be exactly $LENGTH hexadecimal digits."
+            }
+
+            return CRC32(value)
         }
+    }
+}
+
+@ConsistentCopyVisibility
+public data class DueDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) :
+    SpaydAttribute {
+    override val key: String get() = "DT"
+
+    override fun encodedValue(optimizeForQr: Boolean): String =
+        "$year${monthNumber.toString().padStart(2, '0')}${dayOfMonth.toString().padStart(2, '0')}"
+
+    /**
+     * ISO 8601 format: YYYY-MM-DD
+     */
+    override fun toString(): String =
+        "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
+
+    internal companion object Companion {
+        @JvmStatic
+        fun fromString(value: String): DueDate {
+            require(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
+            val year = value.take(4).toInt()
+            val month = value.drop(4).take(2).toInt()
+            val day = value.takeLast(2).toInt()
+            require(year >= 1900) { "Unreasonable year: $year." }
+            require(month in 1..12) { "Month number must be between 1 and 12." }
+            require(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
+            return DueDate(
+                year = year,
+                monthNumber = month,
+                dayOfMonth = day,
+            )
+        }
+
+        private fun daysInMonth(year: Int, monthNumber: Int): Int = when (monthNumber) {
+            1, 3, 5, 7, 8, 10, 12 -> 31
+            4, 6, 9, 11 -> 30
+            2 -> if (isLeapYear(year)) 29 else 28
+            else -> throw IllegalArgumentException("Invalid month number: $monthNumber")
+        }
+
+        private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
     }
 }
 
 @JvmInline
-public value class CzRetryDays private constructor(public val value: Int) {
+public value class Message private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "MSG"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
     internal companion object {
+        val MAX_LENGTH: Int = 60
+
         @JvmStatic
-        fun fromString(value: String): CzRetryDays {
-            require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
-                "X-PER: Retry days must be a number from 1 to 30"
-            }
-            return CzRetryDays(value.toInt())
+        fun fromString(value: String): Message {
+            require(value.length <= MAX_LENGTH) { "MSG: Message must not exceed $MAX_LENGTH characters." }
+            return Message(value)
         }
     }
 }
 
-public enum class NotificationType {
+public enum class NotificationType : SpaydAttribute {
     /** NT:P */
     PHONE,
 
     /** NT:E */
-    EMAIL
+    EMAIL;
+
+    override val key: String get() = "NT"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = when (this) {
+        PHONE -> "P"
+        EMAIL -> "E"
+    }
 }
 
 @JvmInline
-public value class NotificationAddress private constructor(public val value: String) {
+public value class NotificationAddress private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "NTA"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
     internal companion object {
         val MAX_LENGTH: Int = 320
 
@@ -397,7 +435,14 @@ public value class NotificationAddress private constructor(public val value: Str
     }
 }
 
-public sealed class PaymentType {
+public sealed class PaymentType : SpaydAttribute {
+    override val key: String get() = "PT"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = when (this) {
+        is Custom -> value.uppercase()
+        InstantPayment -> "IP"
+    }
+
     /**
      * PT:IP
      *
@@ -420,7 +465,28 @@ public sealed class PaymentType {
 }
 
 @JvmInline
-public value class Recipient private constructor(public val value: String) {
+public value class SenderReference private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "RF"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): SenderReference {
+            require(value.length in 1..16 && isAsciiDigits(value)) {
+                "RF: Sender reference must be a string of digits from 1 to 16 characters long."
+            }
+            return SenderReference(value)
+        }
+    }
+}
+
+@JvmInline
+public value class Recipient private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "RN"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
     internal companion object {
         val MAX_LENGTH: Int = 35
 
@@ -432,9 +498,91 @@ public value class Recipient private constructor(public val value: String) {
 }
 
 @JvmInline
-public value class URL private constructor(public val value: String) {
+public value class VS private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "X-VS"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value
+
     internal companion object {
-        val MAX_LENGTH: Int = 140
+        @JvmStatic
+        fun fromString(value: String): VS {
+            require(value.length in 1..10 && isAsciiDigits(value)) { "VS must be 1 to 10 digits." }
+            return VS(value)
+        }
+    }
+}
+
+@JvmInline
+public value class SS private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "X-SS"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): SS {
+            require(value.length in 1..10 && isAsciiDigits(value)) { "SS must be 1 to 10 digits." }
+            return SS(value)
+        }
+    }
+}
+
+@JvmInline
+public value class KS private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "X-KS"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): KS {
+            require(value.length in 1..10 && isAsciiDigits(value)) { "KS must be 1 to 10 digits." }
+            return KS(value)
+        }
+    }
+}
+
+@JvmInline
+public value class CzRetryDays private constructor(public val value: Int) : SpaydAttribute {
+    override val key: String get() = "X-PER"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = value.toString()
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): CzRetryDays {
+            require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
+                "X-PER: Retry days must be a number from 1 to 30"
+            }
+            return CzRetryDays(value.toInt())
+        }
+    }
+}
+
+@JvmInline
+public value class CzPaymentId private constructor(public val value: String) : SpaydAttribute {
+    override val key: String get() = "X-ID"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
+    internal companion object {
+        @JvmStatic
+        fun fromString(value: String): CzPaymentId {
+            require(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
+            return CzPaymentId(value)
+        }
+    }
+}
+
+@JvmInline
+public value class URL private constructor(public val value: String) : SpaydAttribute {
+
+    override val key: String get() = "X-URL"
+
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
+    internal companion object {
+        val MAX_LENGTH = 140
 
         @JvmStatic
         fun fromString(value: String): URL {
@@ -444,25 +592,21 @@ public value class URL private constructor(public val value: String) {
     }
 }
 
-@JvmInline
-public value class CRC32 private constructor(public val value: String) {
+@ConsistentCopyVisibility
+public data class CustomAttribute private constructor(override val key: String, val value: String) : SpaydAttribute {
+    override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
     internal companion object {
-        val LENGTH: Int = 8
-        val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
-
         @JvmStatic
-        fun fromString(value: String): CRC32 {
-            require(value.length == LENGTH && value.all { it in hexDigits }) {
-                "CRC32: CRC32 must be exactly $LENGTH hexadecimal digits."
-            }
-
-            return CRC32(value)
+        fun create(key: String, value: String): CustomAttribute {
+            require(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
+            return CustomAttribute(key, value)
         }
     }
 }
 
 @Throws(IllegalArgumentException::class)
-private fun parseSpayd(spayd: String): SPAYD {
+private fun decode(spayd: String): SPAYD {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
     for ((index, char) in spayd.withIndex()) {
         if (char > '\u00FF') {
@@ -471,29 +615,29 @@ private fun parseSpayd(spayd: String): SPAYD {
     }
     val basicRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
     require(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
-    val spayd = preprocessSpaydString(spayd)
+    val spayd = preprocessForDecoding(spayd)
     val parts = spayd.split('*').drop(2)
 
-    var acc: IbanBic? = null
-    var altAccs: List<IbanBic> = emptyList()
+    var acc: Account? = null
+    var altAccs: AltAccounts? = null
     var amount: Amount? = null
     var currency: Currency? = null
     var crc32: CRC32? = null
-    var dueDate: LocalDate? = null
+    var dueDate: DueDate? = null
     var message: Message? = null
     var notificationType: NotificationType? = null
     var notificationAddress: NotificationAddress? = null
     var paymentType: PaymentType? = null
     var senderReference: SenderReference? = null
     var recipient: Recipient? = null
-    var vs: CzPaymentSymbol? = null
-    var ss: CzPaymentSymbol? = null
-    var ks: CzPaymentSymbol? = null
+    var vs: VS? = null
+    var ss: SS? = null
+    var ks: KS? = null
     var retryDays: CzRetryDays? = null
     var paymentId: CzPaymentId? = null
     var url: URL? = null
 
-    val customAttrs = mutableMapOf<String, String>()
+    val customAttrs = mutableListOf<CustomAttribute>()
 
     for ((index, pair) in parts.withIndex()) {
         val kv = pair.split(':', limit = 2)
@@ -504,12 +648,12 @@ private fun parseSpayd(spayd: String): SPAYD {
 
         // TODO SPAYD spec does not specify how duplicate keys should be handled. Therefore, last wins.
         when (key) {
-            "ACC" -> acc = IbanBic.fromString(value)
-            "ALT-ACC" -> altAccs = parseAltAcc(value)
+            "ACC" -> acc = Account.fromString(value)
+            "ALT-ACC" -> altAccs = AltAccounts.fromString(value)
             "AM" -> amount = Amount.fromString(value)
             "CC" -> currency = Currency.fromString(value)
             "CRC32" -> crc32 = CRC32.fromString(value)
-            "DT" -> dueDate = LocalDate.fromString(value)
+            "DT" -> dueDate = DueDate.fromString(value)
             "MSG" -> message = Message.fromString(value)
             "NT" -> notificationType = parseNotificationType(value)
             "NTA" -> notificationAddress = NotificationAddress.fromString(value)
@@ -517,14 +661,14 @@ private fun parseSpayd(spayd: String): SPAYD {
             "RF" -> senderReference = SenderReference.fromString(value)
             "RN" -> recipient = Recipient.fromString(value)
             // Czech extension attrs
-            "X-VS" -> vs = CzPaymentSymbol.fromString(value)
-            "X-SS" -> ss = CzPaymentSymbol.fromString(value)
-            "X-KS" -> ks = CzPaymentSymbol.fromString(value) // Az 10 symbolu pro jednoduchost, realne max 4 cislice
+            "X-VS" -> vs = VS.fromString(value)
+            "X-SS" -> ss = SS.fromString(value)
+            "X-KS" -> ks = KS.fromString(value) // Az 10 symbolu pro jednoduchost, realne max 4 cislice
             "X-PER" -> retryDays = CzRetryDays.fromString(value)
             "X-ID" -> paymentId = CzPaymentId.fromString(value)
             "X-URL" -> url = URL.fromString(value)
             // Unknown custom attributes
-            else -> customAttrs[key] = value
+            else -> customAttrs.add(CustomAttribute.create(key, value))
         }
     }
     require(acc != null) { "Missing required attribute 'ACC'." }
@@ -547,11 +691,11 @@ private fun parseSpayd(spayd: String): SPAYD {
         retryDays = retryDays,
         paymentId = paymentId,
         url = url,
-        customAttributes = customAttrs.toMap(),
+        customAttributes = customAttrs,
     )
 }
 
-private fun preprocessSpaydString(spayd: String, lenient: Boolean = false): String {
+private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): String {
     var spayd = spayd
     if (lenient) {
         spayd = spayd.trim()
@@ -566,14 +710,6 @@ private fun preprocessSpaydString(spayd: String, lenient: Boolean = false): Stri
     }
 
     return spayd
-}
-
-private fun parseAltAcc(value: String): List<IbanBic> {
-    return try {
-        value.split(',').map(IbanBic::fromString)
-    } catch (e: IllegalArgumentException) {
-        throw IllegalArgumentException("Cannot parse ALT-ACC: ${e.message}", e)
-    }
 }
 
 private fun parseNotificationType(value: String): NotificationType {
@@ -607,6 +743,40 @@ private fun checkKey(index: Int, key: String) {
         // TODO Emit a warning if configured
     }
 }
+
+private fun SpaydAttribute?.encodeAsAttr(optimizeForQr: Boolean): String {
+    if (this == null) return ""
+    return "${key}:${encodedValue(optimizeForQr)}*"
+}
+
+private fun encode(spayd: SPAYD, optimizeForQr: Boolean): String = buildString {
+    append("SPD*1.0*")
+    append(spayd.account.encodeAsAttr(optimizeForQr))
+    append(spayd.altAccounts.encodeAsAttr(optimizeForQr))
+    append(spayd.amount.encodeAsAttr(optimizeForQr))
+    append(spayd.currency.encodeAsAttr(optimizeForQr))
+    append(spayd.crc32.encodeAsAttr(optimizeForQr))
+    append(spayd.dueDate.encodeAsAttr(optimizeForQr))
+    append(spayd.message.encodeAsAttr(optimizeForQr))
+    append(spayd.notificationType.encodeAsAttr(optimizeForQr))
+    append(spayd.notificationAddress.encodeAsAttr(optimizeForQr))
+    append(spayd.paymentType.encodeAsAttr(optimizeForQr))
+    append(spayd.senderReference.encodeAsAttr(optimizeForQr))
+    append(spayd.recipient.encodeAsAttr(optimizeForQr))
+    append(spayd.vs.encodeAsAttr(optimizeForQr))
+    append(spayd.ss.encodeAsAttr(optimizeForQr))
+    append(spayd.ks.encodeAsAttr(optimizeForQr))
+    append(spayd.retryDays.encodeAsAttr(optimizeForQr))
+    append(spayd.paymentId.encodeAsAttr(optimizeForQr))
+    append(spayd.url.encodeAsAttr(optimizeForQr))
+    for (attr in spayd.customAttributes) {
+        append(attr.key)
+        append(':')
+        append(spaydPercentEncode(attr.value, optimizeForQr))
+        append('*')
+    }
+}
+
 
 private val spaydAllowedChars: Set<Char> =
     ('\u0000'..'\u007F')
