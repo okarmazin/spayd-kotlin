@@ -15,6 +15,13 @@ version = "0.0.1"
 kotlin {
     explicitApi()
     jvm()
+    js {
+        browser()
+        nodejs()
+    }
+    wasmWasi {
+        nodejs()
+    }
     androidTarget {
         publishLibraryVariants("release")
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
