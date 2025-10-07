@@ -5,8 +5,7 @@ package tools.kmp.spayd
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmStatic
 
-@ConsistentCopyVisibility
-public data class SPAYD internal constructor(
+public data class SPAYD(
     /** ACC: Account, the only required attribute */
     val account: Account,
     /** ALT-ACC */
@@ -114,13 +113,13 @@ public data class IBAN private constructor(val value: String) {
 
     public fun readable(): String = value.chunked(4).joinToString(" ")
 
-    internal companion object {
-        const val MIN_LENGTH = 16
-        const val MAX_LENGTH = 34
+    public companion object {
+        public const val MIN_LENGTH: Int = 16
+        public const val MAX_LENGTH: Int = 34
 
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): IBAN {
+        public fun fromString(string: String): IBAN {
             val string = string.filterNot { it.isWhitespace() }
             require(string.length in MIN_LENGTH..MAX_LENGTH) {
                 "IBAN length (${string.length}) is not in the allowed range $MIN_LENGTH..$MAX_LENGTH."
@@ -143,7 +142,7 @@ public data class IBAN private constructor(val value: String) {
             return IBAN(string)
         }
 
-        fun from(czBankAccount: CZBankAccount): IBAN {
+        public fun from(czBankAccount: CZBankAccount): IBAN {
             val bankCode = czBankAccount.bankCode.value
             val prefix = czBankAccount.accountNumber.prefix.padStart(6, '0')
             val account = czBankAccount.accountNumber.accountNumber.padStart(10, '0')
@@ -170,11 +169,11 @@ public data class IBAN private constructor(val value: String) {
 public data class BIC private constructor(val value: String) {
     override fun toString(): String = value
 
-    internal companion object {
+    public companion object {
 
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): BIC {
+        public fun fromString(string: String): BIC {
             // From Wikipedia:
             // 4 letters, 2 letters, 2 alphanum, 3 alphanum (optional)
             require(string.length == 8 || string.length == 11) {
@@ -190,7 +189,7 @@ public data class BIC private constructor(val value: String) {
 }
 
 @ConsistentCopyVisibility
-public data class CZBankAccount private constructor(
+public data class CZBankAccount(
     val accountNumber: CZBankAccountNumber,
     val bankCode: BankCode
 ) {
@@ -221,14 +220,14 @@ public data class CZBankAccountNumber private constructor(val prefix: String, va
 
     override fun toString(): String = "${if (prefix.isNotBlank()) "$prefix-" else ""}$accountNumber"
 
-    internal companion object {
+    public companion object {
         // https://www.cnb.cz/export/sites/cnb/cs/legislativa/.galleries/vyhlasky/vyhlaska_169_2011.pdf
         private val weights = listOf(1, 2, 4, 8, 5, 10, 9, 7, 3, 6)
         private val regex = Regex("^[0-9]{2,10}$|^[0-9]{2,6}-[0-9]{2,10}$")
 
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): CZBankAccountNumber {
+        public fun fromString(string: String): CZBankAccountNumber {
             val string = string.trim()
             require(string.matches(regex)) { "Invalid CZ bank account number format." }
             val parts = string.split("-")
@@ -271,10 +270,10 @@ public data class CZBankAccountNumber private constructor(val prefix: String, va
 public data class BankCode private constructor(val value: String) {
     override fun toString(): String = value
 
-    internal companion object {
+    public companion object {
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun fromString(string: String): BankCode {
+        public fun fromString(string: String): BankCode {
             require(string.length == 4 && string.all { it in '0'..'9' }) {
                 "Invalid bank code. Must be exactly 4 digits. Input has either bad length, or contains non-digits."
             }
@@ -289,9 +288,9 @@ public value class Amount private constructor(public val value: String) : SpaydA
 
     override fun encodedValue(optimizeForQr: Boolean): String = value
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): Amount {
+        public fun fromString(value: String): Amount {
             require(value.length in 1..10 && value != ".") { "AM: Amount must not exceed 10 characters and must have at least 1 digit" }
             require(value.all { isAsciiDigit(it) || it == '.' }) { "AM: Amount must contain only digits or a decimal point" }
             val parts = value.split('.')
@@ -312,9 +311,9 @@ public value class Currency private constructor(public val code: String) : Spayd
 
     override fun encodedValue(optimizeForQr: Boolean): String = code.uppercase()
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): Currency {
+        public fun fromString(value: String): Currency {
             require(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
                 "CC: Currency code must be exactly 3 letters."
             }
@@ -329,12 +328,12 @@ public value class CRC32 private constructor(public val value: String) : SpaydAt
 
     override fun encodedValue(optimizeForQr: Boolean): String = value.uppercase()
 
-    internal companion object {
-        val LENGTH: Int = 8
-        val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
+    public companion object {
+        private const val LENGTH: Int = 8
+        private val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
 
         @JvmStatic
-        fun fromString(value: String): CRC32 {
+        public fun fromString(value: String): CRC32 {
             require(value.length == LENGTH && value.all { it in hexDigits }) {
                 "CRC32: CRC32 must be exactly $LENGTH hexadecimal digits."
             }
@@ -358,13 +357,20 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
     override fun toString(): String =
         "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
 
-    internal companion object Companion {
+    public companion object Companion {
+
+        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): DueDate = create(year, monthNumber, dayOfMonth)
+
         @JvmStatic
-        fun fromString(value: String): DueDate {
+        internal fun fromString(value: String): DueDate {
             require(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
             val year = value.take(4).toInt()
             val month = value.drop(4).take(2).toInt()
             val day = value.takeLast(2).toInt()
+            return create(year, month, day)
+        }
+
+        private fun create(year: Int, month: Int, day: Int): DueDate {
             require(year >= 1900) { "Unreasonable year: $year." }
             require(month in 1..12) { "Month number must be between 1 and 12." }
             require(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
@@ -392,11 +398,11 @@ public value class Message private constructor(public val value: String) : Spayd
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
-        val MAX_LENGTH: Int = 60
+    public companion object {
+        public val MAX_LENGTH: Int = 60
 
         @JvmStatic
-        fun fromString(value: String): Message {
+        public fun fromString(value: String): Message {
             require(value.length <= MAX_LENGTH) { "MSG: Message must not exceed $MAX_LENGTH characters." }
             return Message(value)
         }
@@ -424,11 +430,11 @@ public value class NotificationAddress private constructor(public val value: Str
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
-        val MAX_LENGTH: Int = 320
+    public companion object {
+        public const val MAX_LENGTH: Int = 320
 
         @JvmStatic
-        fun fromString(value: String): NotificationAddress {
+        public fun fromString(value: String): NotificationAddress {
             require(value.length <= MAX_LENGTH) { "NTA: Notification address must be at most $MAX_LENGTH characters long." }
             return NotificationAddress(value)
         }
@@ -452,9 +458,9 @@ public sealed class PaymentType : SpaydAttribute {
 
     public data class Custom(val value: String) : PaymentType()
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): PaymentType {
+        public fun fromString(value: String): PaymentType {
             require(value.length in 1..3) { "PT: Payment type must be 1 to 3 characters long." }
             return when (value) {
                 "IP" -> InstantPayment
@@ -470,9 +476,9 @@ public value class SenderReference private constructor(public val value: String)
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): SenderReference {
+        public fun fromString(value: String): SenderReference {
             require(value.length in 1..16 && isAsciiDigits(value)) {
                 "RF: Sender reference must be a string of digits from 1 to 16 characters long."
             }
@@ -487,10 +493,10 @@ public value class Recipient private constructor(public val value: String) : Spa
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
-        val MAX_LENGTH: Int = 35
+    public companion object {
+        public const val MAX_LENGTH: Int = 35
 
-        fun fromString(value: String): Recipient {
+        public fun fromString(value: String): Recipient {
             require(value.length <= MAX_LENGTH) { "RN: Recipient must be at most $MAX_LENGTH characters long." }
             return Recipient(value)
         }
@@ -503,9 +509,9 @@ public value class VS private constructor(public val value: String) : SpaydAttri
 
     override fun encodedValue(optimizeForQr: Boolean): String = value
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): VS {
+        public fun fromString(value: String): VS {
             require(value.length in 1..10 && isAsciiDigits(value)) { "X-VS: VS must be 1 to 10 digits." }
             return VS(value)
         }
@@ -518,9 +524,9 @@ public value class SS private constructor(public val value: String) : SpaydAttri
 
     override fun encodedValue(optimizeForQr: Boolean): String = value
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): SS {
+        public fun fromString(value: String): SS {
             require(value.length in 1..10 && isAsciiDigits(value)) { "X-SS: SS must be 1 to 10 digits." }
             return SS(value)
         }
@@ -533,9 +539,9 @@ public value class KS private constructor(public val value: String) : SpaydAttri
 
     override fun encodedValue(optimizeForQr: Boolean): String = value
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): KS {
+        public fun fromString(value: String): KS {
             require(value.length in 1..10 && isAsciiDigits(value)) { "X-KS: KS must be 1 to 10 digits." }
             return KS(value)
         }
@@ -548,9 +554,9 @@ public value class CzRetryDays private constructor(public val value: Int) : Spay
 
     override fun encodedValue(optimizeForQr: Boolean): String = value.toString()
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): CzRetryDays {
+        public fun fromString(value: String): CzRetryDays {
             require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
                 "X-PER: Retry days must be a number from 1 to 30"
             }
@@ -565,9 +571,9 @@ public value class CzPaymentId private constructor(public val value: String) : S
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun fromString(value: String): CzPaymentId {
+        public fun fromString(value: String): CzPaymentId {
             require(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
             return CzPaymentId(value)
         }
@@ -581,11 +587,11 @@ public value class URL private constructor(public val value: String) : SpaydAttr
 
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
-        val MAX_LENGTH = 140
+    public companion object {
+        public const val MAX_LENGTH: Int = 140
 
         @JvmStatic
-        fun fromString(value: String): URL {
+        public fun fromString(value: String): URL {
             require(value.length <= MAX_LENGTH) { "X-URL: URL must be at most $MAX_LENGTH characters long." }
             return URL(value)
         }
@@ -596,9 +602,9 @@ public value class URL private constructor(public val value: String) : SpaydAttr
 public data class CustomAttribute private constructor(override val key: String, val value: String) : SpaydAttribute {
     override fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
-    internal companion object {
+    public companion object {
         @JvmStatic
-        fun create(key: String, value: String): CustomAttribute {
+        public fun create(key: String, value: String): CustomAttribute {
             require(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
             return CustomAttribute(key, value)
         }
