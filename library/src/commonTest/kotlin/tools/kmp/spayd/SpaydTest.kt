@@ -44,7 +44,7 @@ class SpaydTest {
 
     @Test
     fun `test parsing`() {
-        SPAYD.decodeFromString(validFull)
+        Spayd.decodeFromString(validFull)
     }
 
     @Test
@@ -83,7 +83,7 @@ class SpaydTest {
         for ((index, invalidString) in invalidStrings.withIndex()) {
             val exception = assertFailsWith<IllegalArgumentException>(
                 message = "Expected IllegalArgumentException for string: '$invalidString'",
-                block = { SPAYD.decodeFromString(invalidString) }
+                block = { Spayd.decodeFromString(invalidString) }
             )
             assertEquals(
                 "Missing required prefix 'SPD*{VERSION}*'",
@@ -97,14 +97,14 @@ class SpaydTest {
         run {
             val cases = listOf("SPD*1.0*ACC", "SPD*1.0*ACC*")
             for (case in cases) {
-                val exception = assertFailsWith<IllegalArgumentException> { SPAYD.decodeFromString(case) }
+                val exception = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(case) }
                 assertEquals("Invalid key-value pair at index 0: missing ':' delimiter.", exception.message)
             }
         }
         run {
             val cases = listOf("SPD*1.0*X-A:123*MSG", "SPD*1.0*X-A:123*MSG*")
             for (case in cases) {
-                val exception = assertFailsWith<IllegalArgumentException> { SPAYD.decodeFromString(case) }
+                val exception = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(case) }
                 assertEquals("Invalid key-value pair at index 1: missing ':' delimiter.", exception.message)
             }
         }
@@ -113,7 +113,7 @@ class SpaydTest {
     @Test
     fun `test illegal characters in key-value pair KEYS`() {
         fun performTest(input: String, idx: Int, c: Char, cidx: Int) {
-            val ex = assertFailsWith<IllegalArgumentException> { SPAYD.decodeFromString(input) }
+            val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(input) }
             val expected =
                 "Key-value at index $idx contains illegal character '$c' at index ${cidx}. Allowed key characters: [A-Z-]"
             assertEquals(expected, ex.message)
@@ -123,13 +123,13 @@ class SpaydTest {
         performTest("SPD*1.0*X-A:a*MSG?:123", 1, '?', 3)
         performTest("SPD*1.0*X-A:a*MSG?:123*", 1, '?', 3)
 
-        SPAYD.decodeFromString("$prefix${acc}X--:a*")
+        Spayd.decodeFromString("$prefix${acc}X--:a*")
     }
 
     @Test
     fun `test illegal prefix in key-value pair KEYS`() {
         fun performTest(input: String) {
-            val ex = assertFailsWith<IllegalArgumentException> { SPAYD.decodeFromString(input) }
+            val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(input) }
             val expected = "Custom keys must start with 'X-'."
             assertEquals(expected, ex.message)
         }
@@ -141,12 +141,12 @@ class SpaydTest {
     @Test
     fun `test valid acc`() {
         run {
-            val result = SPAYD.decodeFromString("$prefix${acc}")
+            val result = Spayd.decodeFromString("$prefix${acc}")
 
             assertEquals(Account(IbanBic(iban, null)), result.account)
         }
         run {
-            val result = SPAYD.decodeFromString("$prefix${accBic}")
+            val result = Spayd.decodeFromString("$prefix${accBic}")
             assertEquals(Account(IbanBic(iban, bic)), result.account)
         }
     }
@@ -154,7 +154,7 @@ class SpaydTest {
     @Test
     fun `test valid alt-acc`() {
         run {
-            val result = SPAYD.decodeFromString("$prefix${acc}ALT-ACC:$iban,${iban}+${bic}".also(::println))
+            val result = Spayd.decodeFromString("$prefix${acc}ALT-ACC:$iban,${iban}+${bic}".also(::println))
             assertEquals(AltAccounts(listOf(IbanBic(iban, null), IbanBic(iban, bic))), result.altAccounts)
         }
     }
@@ -163,7 +163,7 @@ class SpaydTest {
     fun `test real spayd decode`() {
         val string =
             "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
-        val result = SPAYD.decodeFromString(string)
+        val result = Spayd.decodeFromString(string)
         assertEquals("CZ0608000000192235210247", result.account.value.iban.value)
         assertContentEquals(
             listOf("CZ9003000000192235210247", "CZ4601000000192235210247"),
@@ -178,7 +178,7 @@ class SpaydTest {
 
     @Test
     fun `test real spayd encode`() {
-        val spayd = SPAYD(
+        val spayd = Spayd(
             Account.fromString("CZ0608000000192235210247"),
             AltAccounts(
                 listOf(

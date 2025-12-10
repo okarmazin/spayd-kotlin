@@ -5,7 +5,7 @@ package tools.kmp.spayd
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmStatic
 
-public data class SPAYD(
+public data class Spayd(
     /** ACC: Account, the only required attribute */
     val account: Account,
     /** ALT-ACC */
@@ -48,10 +48,10 @@ public data class SPAYD(
 ) {
     public fun encodeToString(optimizeForQr: Boolean): String = encode(this, optimizeForQr)
 
-    public companion object {
+    public companion object Companion {
         @Throws(IllegalArgumentException::class)
         @JvmStatic
-        public fun decodeFromString(spaydString: String): SPAYD = decode(spaydString)
+        public fun decodeFromString(spaydString: String): Spayd = decode(spaydString)
     }
 }
 
@@ -612,7 +612,7 @@ public data class CustomAttribute private constructor(override val key: String, 
 }
 
 @Throws(IllegalArgumentException::class)
-private fun decode(spayd: String): SPAYD {
+private fun decode(spayd: String): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
     for ((index, char) in spayd.withIndex()) {
         if (char > '\u00FF') {
@@ -678,7 +678,7 @@ private fun decode(spayd: String): SPAYD {
         }
     }
     require(acc != null) { "Missing required attribute 'ACC'." }
-    return SPAYD(
+    return Spayd(
         account = acc,
         altAccounts = altAccs,
         amount = amount,
@@ -755,7 +755,7 @@ private fun SpaydAttribute?.encodeAsAttr(optimizeForQr: Boolean): String {
     return "${key}:${encodedValue(optimizeForQr)}*"
 }
 
-private fun encode(spayd: SPAYD, optimizeForQr: Boolean): String = buildString {
+private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
     append("SPD*1.0*")
     append(spayd.account.encodeAsAttr(optimizeForQr))
     append(spayd.altAccounts.encodeAsAttr(optimizeForQr))
