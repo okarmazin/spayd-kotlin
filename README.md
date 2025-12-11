@@ -16,6 +16,10 @@ your project!
 <p>The library is purposefully written as a single file to enable convenient copying.
 Since this library has no external dependencies, you can freely copy the source into your project and it will just work.</p>
 
+## Supported platforms
+Supports all Kotlin targets, all of them should be enabled. If there's a missing platform, please open an issue 
+and it will get added.
+
 ## Serialization
 
 ```kotlin
