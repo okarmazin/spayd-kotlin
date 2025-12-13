@@ -5,48 +5,98 @@ package tools.kmp.spayd
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmStatic
 
-public data class Spayd(
+public class Spayd(
     /** ACC: Account, the only required attribute */
-    val account: Account,
+    public val account: Account,
     /** ALT-ACC */
-    val altAccounts: AltAccounts?,
+    public val altAccounts: AltAccounts?,
     /** AM */
-    val amount: Amount?,
+    public val amount: Amount?,
     /** CC */
-    val currency: Currency?,
+    public val currency: Currency?,
     /** CRC32 */
-    val crc32: CRC32?,
+    public val crc32: CRC32?,
     /** DT: Datum splatnosti */
-    val dueDate: DueDate?,
+    public val dueDate: DueDate?,
     /** MSG */
-    val message: Message?,
+    public val message: Message?,
     /** NT */
-    val notificationType: NotificationType?,
+    public val notificationType: NotificationType?,
     /** NTA: Notification recipient. Either a phone number, or an email address depending on the notification type. */
-    val notificationAddress: NotificationAddress?,
+    public val notificationAddress: NotificationAddress?,
     /** PT */
-    val paymentType: PaymentType?,
+    public val paymentType: PaymentType?,
     /** RF */
-    val senderReference: SenderReference?,
+    public val senderReference: SenderReference?,
     /** RN */
-    val recipient: Recipient?,
+    public val recipient: Recipient?,
 
     /** X-VS */
-    val vs: VS?,
+    public val vs: VS?,
     /** X-SS */
-    val ss: SS?,
+    public val ss: SS?,
     /** X-KS */
-    val ks: KS?,
+    public val ks: KS?,
     /** X-PER */
-    val retryDays: CzRetryDays?,
+    public val retryDays: CzRetryDays?,
     /** X-ID */
-    val paymentId: CzPaymentId?,
+    public val paymentId: CzPaymentId?,
     /** X-URL */
-    val url: URL?,
+    public val url: URL?,
 
-    val customAttributes: List<CustomAttribute>,
+    public val customAttributes: List<CustomAttribute>,
 ) {
     public fun encodeToString(optimizeForQr: Boolean): String = encode(this, optimizeForQr)
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Spayd) return false
+
+        if (account != other.account) return false
+        if (altAccounts != other.altAccounts) return false
+        if (amount != other.amount) return false
+        if (currency != other.currency) return false
+        if (crc32 != other.crc32) return false
+        if (dueDate != other.dueDate) return false
+        if (message != other.message) return false
+        if (notificationType != other.notificationType) return false
+        if (notificationAddress != other.notificationAddress) return false
+        if (paymentType != other.paymentType) return false
+        if (senderReference != other.senderReference) return false
+        if (recipient != other.recipient) return false
+        if (vs != other.vs) return false
+        if (ss != other.ss) return false
+        if (ks != other.ks) return false
+        if (retryDays != other.retryDays) return false
+        if (paymentId != other.paymentId) return false
+        if (url != other.url) return false
+        if (customAttributes != other.customAttributes) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = account.hashCode()
+        result = 31 * result + (altAccounts?.hashCode() ?: 0)
+        result = 31 * result + (amount?.hashCode() ?: 0)
+        result = 31 * result + (currency?.hashCode() ?: 0)
+        result = 31 * result + (crc32?.hashCode() ?: 0)
+        result = 31 * result + (dueDate?.hashCode() ?: 0)
+        result = 31 * result + (message?.hashCode() ?: 0)
+        result = 31 * result + (notificationType?.hashCode() ?: 0)
+        result = 31 * result + (notificationAddress?.hashCode() ?: 0)
+        result = 31 * result + (paymentType?.hashCode() ?: 0)
+        result = 31 * result + (senderReference?.hashCode() ?: 0)
+        result = 31 * result + (recipient?.hashCode() ?: 0)
+        result = 31 * result + (vs?.hashCode() ?: 0)
+        result = 31 * result + (ss?.hashCode() ?: 0)
+        result = 31 * result + (ks?.hashCode() ?: 0)
+        result = 31 * result + (retryDays?.hashCode() ?: 0)
+        result = 31 * result + (paymentId?.hashCode() ?: 0)
+        result = 31 * result + (url?.hashCode() ?: 0)
+        result = 31 * result + customAttributes.hashCode()
+        return result
+    }
 
     public companion object Companion {
         @Throws(IllegalArgumentException::class)
