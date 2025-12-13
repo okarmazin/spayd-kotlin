@@ -750,31 +750,37 @@ private fun checkKey(index: Int, key: String) {
     }
 }
 
-private fun SpaydAttribute?.encodeAsAttr(optimizeForQr: Boolean): String {
-    if (this == null) return ""
+private fun SpaydAttribute.encodeAsAttr(optimizeForQr: Boolean): String {
     return "${key}:${encodedValue(optimizeForQr)}*"
 }
 
 private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
     append("SPD*1.0*")
-    append(spayd.account.encodeAsAttr(optimizeForQr))
-    append(spayd.altAccounts.encodeAsAttr(optimizeForQr))
-    append(spayd.amount.encodeAsAttr(optimizeForQr))
-    append(spayd.currency.encodeAsAttr(optimizeForQr))
-    append(spayd.crc32.encodeAsAttr(optimizeForQr))
-    append(spayd.dueDate.encodeAsAttr(optimizeForQr))
-    append(spayd.message.encodeAsAttr(optimizeForQr))
-    append(spayd.notificationType.encodeAsAttr(optimizeForQr))
-    append(spayd.notificationAddress.encodeAsAttr(optimizeForQr))
-    append(spayd.paymentType.encodeAsAttr(optimizeForQr))
-    append(spayd.senderReference.encodeAsAttr(optimizeForQr))
-    append(spayd.recipient.encodeAsAttr(optimizeForQr))
-    append(spayd.vs.encodeAsAttr(optimizeForQr))
-    append(spayd.ss.encodeAsAttr(optimizeForQr))
-    append(spayd.ks.encodeAsAttr(optimizeForQr))
-    append(spayd.retryDays.encodeAsAttr(optimizeForQr))
-    append(spayd.paymentId.encodeAsAttr(optimizeForQr))
-    append(spayd.url.encodeAsAttr(optimizeForQr))
+    val standardAttributes = listOfNotNull(
+        spayd.account,
+        spayd.altAccounts,
+        spayd.amount,
+        spayd.currency,
+        spayd.crc32,
+        spayd.dueDate,
+        spayd.message,
+        spayd.notificationType,
+        spayd.notificationAddress,
+        spayd.paymentType,
+        spayd.senderReference,
+        spayd.recipient,
+        spayd.vs,
+        spayd.ss,
+        spayd.ks,
+        spayd.retryDays,
+        spayd.paymentId,
+        spayd.url,
+    )
+
+    for (attr in standardAttributes) {
+        append(attr.encodeAsAttr(optimizeForQr))
+    }
+
     for (attr in spayd.customAttributes) {
         append(attr.key)
         append(':')
