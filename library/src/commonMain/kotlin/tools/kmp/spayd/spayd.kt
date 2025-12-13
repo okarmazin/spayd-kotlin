@@ -98,7 +98,7 @@ public class Spayd(
         return result
     }
 
-    public companion object Companion {
+    public companion object {
         @Throws(IllegalArgumentException::class)
         @JvmStatic
         public fun decodeFromString(spaydString: String): Spayd = decode(spaydString)
@@ -407,7 +407,7 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
     override fun toString(): String =
         "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
 
-    public companion object Companion {
+    public companion object {
 
         public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): DueDate = create(year, monthNumber, dayOfMonth)
 
