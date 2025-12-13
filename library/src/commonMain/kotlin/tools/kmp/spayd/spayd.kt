@@ -875,3 +875,33 @@ internal fun spaydPercentDecode(content: String): String {
     }
     return builder.toString()
 }
+
+internal object Crc32Computer {
+    private const val POLYNOMIAL = 0xEDB88320.toInt()
+
+    private val lookupTable: IntArray = IntArray(256) { i ->
+        var crc = i
+        repeat(8) {
+            crc = if (crc and 1 == 1) {
+                (crc ushr 1) xor POLYNOMIAL
+            } else {
+                crc ushr 1
+            }
+        }
+        crc
+    }
+
+    fun compute(data: ByteArray): Long {
+        var crc = 0xFFFFFFFF.toInt()
+        for (byte in data) {
+            val index = (crc xor byte.toInt()) and 0xFF
+            crc = (crc ushr 8) xor lookupTable[index]
+        }
+        return (crc xor 0xFFFFFFFF.toInt()).toLong() and 0xFFFFFFFFL
+    }
+
+    fun computeHex(data: ByteArray): String = compute(data).toString(16).uppercase().padStart(8, '0')
+
+    fun computeHex(text: String): String =
+        compute(text.encodeToByteArray()).toString(16).uppercase().padStart(8, '0')
+}
