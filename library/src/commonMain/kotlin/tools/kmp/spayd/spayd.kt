@@ -14,8 +14,6 @@ public class Spayd private constructor(
     public val amount: Amount?,
     /** CC */
     public val currency: Currency?,
-    /** CRC32 */
-    public val crc32: CRC32?,
     /** DT: Datum splatnosti */
     public val dueDate: DueDate?,
     /** MSG */
@@ -56,7 +54,6 @@ public class Spayd private constructor(
         if (altAccounts != other.altAccounts) return false
         if (amount != other.amount) return false
         if (currency != other.currency) return false
-        if (crc32 != other.crc32) return false
         if (dueDate != other.dueDate) return false
         if (message != other.message) return false
         if (notificationType != other.notificationType) return false
@@ -80,7 +77,6 @@ public class Spayd private constructor(
         result = 31 * result + (altAccounts?.hashCode() ?: 0)
         result = 31 * result + (amount?.hashCode() ?: 0)
         result = 31 * result + (currency?.hashCode() ?: 0)
-        result = 31 * result + (crc32?.hashCode() ?: 0)
         result = 31 * result + (dueDate?.hashCode() ?: 0)
         result = 31 * result + (message?.hashCode() ?: 0)
         result = 31 * result + (notificationType?.hashCode() ?: 0)
@@ -156,7 +152,7 @@ public class Spayd private constructor(
             return Spayd(
                 acc,
                 altAccs.takeIf { it.isNotEmpty() }?.toSet(),
-                amount, currency, null, dueDate, message, notificationType, notificationAddress, paymentType,
+                amount, currency, dueDate, message, notificationType, notificationAddress, paymentType,
                 senderReference, recipient, vs, ss, ks, retryDays, paymentId, url,
                 customAttrs.takeIf { it.isNotEmpty() }
             )
@@ -822,7 +818,6 @@ private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
     val attributes = listOfNotNull(
         spayd.amount,
         spayd.currency,
-        spayd.crc32,
         spayd.dueDate,
         spayd.message,
         spayd.notificationType,
