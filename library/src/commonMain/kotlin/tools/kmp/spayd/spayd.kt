@@ -7,9 +7,9 @@ import kotlin.jvm.JvmStatic
 
 public class Spayd private constructor(
     /** ACC: Account, the only required attribute */
-    public val account: Account,
+    public val account: IbanBic,
     /** ALT-ACC */
-    public val altAccounts: AltAccounts?,
+    public val altAccounts: Set<IbanBic>?,
     /** AM */
     public val amount: Amount?,
     /** CC */
@@ -44,7 +44,7 @@ public class Spayd private constructor(
     /** X-URL */
     public val url: URL?,
 
-    public val customAttributes: List<CustomAttribute>,
+    public val customAttributes: List<CustomAttribute>?,
 ) {
     public fun encodeToString(optimizeForQr: Boolean): String = encode(this, optimizeForQr)
 
@@ -94,7 +94,7 @@ public class Spayd private constructor(
         result = 31 * result + (retryDays?.hashCode() ?: 0)
         result = 31 * result + (paymentId?.hashCode() ?: 0)
         result = 31 * result + (url?.hashCode() ?: 0)
-        result = 31 * result + customAttributes.hashCode()
+        result = 31 * result + (customAttributes?.hashCode() ?: 0)
         return result
     }
 
@@ -154,10 +154,11 @@ public class Spayd private constructor(
             val acc = acc ?: throw IllegalArgumentException("ACC: Account attribute is required.")
 
             return Spayd(
-                Account(acc),
-                altAccs.takeIf { it.isNotEmpty() }?.toSet()?.let(::AltAccounts),
+                acc,
+                altAccs.takeIf { it.isNotEmpty() }?.toSet(),
                 amount, currency, null, dueDate, message, notificationType, notificationAddress, paymentType,
-                senderReference, recipient, vs, ss, ks, retryDays, paymentId, url, customAttrs
+                senderReference, recipient, vs, ss, ks, retryDays, paymentId, url,
+                customAttrs.takeIf { it.isNotEmpty() }
             )
         }
     }
@@ -166,25 +167,6 @@ public class Spayd private constructor(
 internal interface SpaydAttribute {
     val key: String
     fun encodedValue(optimizeForQr: Boolean = true): String
-}
-
-@JvmInline
-public value class Account(public val value: IbanBic) : SpaydAttribute {
-    override val key: String get() = "ACC"
-
-    override fun encodedValue(optimizeForQr: Boolean): String = value.encodedValue()
-
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): Account = Account(IbanBic.fromString(value))
-    }
-}
-
-@JvmInline
-public value class AltAccounts(public val accounts: Set<IbanBic>) : SpaydAttribute {
-    override val key: String get() = "ALT-ACC"
-
-    override fun encodedValue(optimizeForQr: Boolean): String = accounts.joinToString(",") { it.encodedValue() }
 }
 
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
@@ -288,7 +270,7 @@ public data class BIC private constructor(val value: String) {
 }
 
 @ConsistentCopyVisibility
-public data class CZBankAccount(
+public data class CZBankAccount private constructor(
     val accountNumber: CZBankAccountNumber,
     val bankCode: BankCode
 ) {
@@ -833,9 +815,11 @@ private fun checkKey(index: Int, key: String) {
 
 private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
     append("SPD*1.0*")
+    append("ACC:${spayd.account.encodedValue()}*")
+    if (!spayd.altAccounts.isNullOrEmpty()) {
+        append("ALT-ACC:${spayd.altAccounts.joinToString(",") { it.encodedValue() }}*")
+    }
     val attributes = listOfNotNull(
-        spayd.account,
-        spayd.altAccounts,
         spayd.amount,
         spayd.currency,
         spayd.crc32,
@@ -852,7 +836,7 @@ private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
         spayd.retryDays,
         spayd.paymentId,
         spayd.url,
-    ) + spayd.customAttributes
+    ) + spayd.customAttributes.orEmpty()
 
     for (attr in attributes) {
         append("${attr.key}:${attr.encodedValue(optimizeForQr)}*")

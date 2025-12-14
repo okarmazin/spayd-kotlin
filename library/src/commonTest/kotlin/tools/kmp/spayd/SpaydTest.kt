@@ -143,11 +143,11 @@ class SpaydTest {
         run {
             val result = Spayd.decodeFromString("$prefix${acc}")
 
-            assertEquals(Account(IbanBic(iban, null)), result.account)
+            assertEquals(IbanBic(iban, null), result.account)
         }
         run {
             val result = Spayd.decodeFromString("$prefix${accBic}")
-            assertEquals(Account(IbanBic(iban, bic)), result.account)
+            assertEquals(IbanBic(iban, bic), result.account)
         }
     }
 
@@ -155,7 +155,7 @@ class SpaydTest {
     fun `test valid alt-acc`() {
         run {
             val result = Spayd.decodeFromString("$prefix${acc}ALT-ACC:$iban,${iban}+${bic}".also(::println))
-            assertEquals(AltAccounts(setOf(IbanBic(iban, null), IbanBic(iban, bic))), result.altAccounts)
+            assertEquals(setOf(IbanBic(iban, null), IbanBic(iban, bic)), result.altAccounts)
         }
     }
 
@@ -164,10 +164,10 @@ class SpaydTest {
         val string =
             "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
         val result = Spayd.decodeFromString(string)
-        assertEquals("CZ0608000000192235210247", result.account.value.iban.value)
+        assertEquals("CZ0608000000192235210247", result.account.iban.value)
         assertContentEquals(
             listOf("CZ9003000000192235210247", "CZ4601000000192235210247"),
-            result.altAccounts?.accounts?.map { it.iban.value })
+            result.altAccounts?.map { it.iban.value })
         assertEquals("399.00", result.amount!!.value)
         assertEquals("CZK", result.currency!!.code)
         assertEquals("T-Mobile Czech Republic a.s.", result.recipient?.value)
