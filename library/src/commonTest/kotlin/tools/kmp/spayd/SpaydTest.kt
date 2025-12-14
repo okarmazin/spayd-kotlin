@@ -177,6 +177,23 @@ class SpaydTest {
     }
 
     @Test
+    fun `test last wins when decoding`() {
+        val string =
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
+        val result = Spayd.decodeFromString(string)
+        assertEquals("CZ0608000000192235210247", result.account.iban.value)
+        assertContentEquals(
+            listOf("CZ9106000000000000000123"), // Last wins and it is deduplicated
+            result.altAccounts?.map { it.iban.value })
+        assertEquals("399.00", result.amount!!.value)
+        assertEquals("CZK", result.currency!!.code)
+        assertEquals("T-Mobile Czech Republic a.s.", result.recipient?.value)
+        assertEquals("1113334445", result.vs!!.value)
+        assertEquals("11", result.ss!!.value)
+        assertEquals("T-Mobile - QR platba123áé ‰*", result.message!!.value)
+    }
+
+    @Test
     fun `test real spayd encode`() {
         val spayd = Spayd.Builder()
             .account(IbanBic.fromString("CZ0608000000192235210247"))
