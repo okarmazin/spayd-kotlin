@@ -155,7 +155,7 @@ class SpaydTest {
     fun `test valid alt-acc`() {
         run {
             val result = Spayd.decodeFromString("$prefix${acc}ALT-ACC:$iban,${iban}+${bic}".also(::println))
-            assertEquals(AltAccounts(listOf(IbanBic(iban, null), IbanBic(iban, bic))), result.altAccounts)
+            assertEquals(AltAccounts(setOf(IbanBic(iban, null), IbanBic(iban, bic))), result.altAccounts)
         }
     }
 
@@ -178,32 +178,18 @@ class SpaydTest {
 
     @Test
     fun `test real spayd encode`() {
-        val spayd = Spayd(
-            Account.fromString("CZ0608000000192235210247"),
-            AltAccounts(
-                listOf(
-                    IbanBic.fromString("CZ9003000000192235210247"),
-                    IbanBic.fromString("CZ4601000000192235210247")
-                )
-            ),
-            Amount.fromString("399.00"),
-            Currency.fromString("CZK"),
-            null,
-            null,
-            Message.fromString("T-Mobile - QR platba123áé ‰*"),
-            null,
-            null,
-            null,
-            null,
-            Recipient.fromString("T-Mobile Czech Republic a.s."),
-            VS.fromString("1113334445"),
-            SS.fromString("11"),
-            null,
-            null,
-            null,
-            null,
-            emptyList()
-        )
+        val spayd = Spayd.Builder()
+            .account(IbanBic.fromString("CZ0608000000192235210247"))
+            .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+            .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
+            .amount(Amount.fromString("399.00"))
+            .currency(Currency.fromString("CZK"))
+            .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
+            .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+            .vs(VS.fromString("1113334445"))
+            .ss(SS.fromString("11"))
+            .build()
+
         val expectedUnoptimized =
             "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.00*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*"
         assertEquals(expectedUnoptimized, spayd.encodeToString(false))

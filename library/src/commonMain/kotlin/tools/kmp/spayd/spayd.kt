@@ -5,7 +5,7 @@ package tools.kmp.spayd
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmStatic
 
-public class Spayd(
+public class Spayd private constructor(
     /** ACC: Account, the only required attribute */
     public val account: Account,
     /** ALT-ACC */
@@ -103,6 +103,64 @@ public class Spayd(
         @JvmStatic
         public fun decodeFromString(spaydString: String): Spayd = decode(spaydString)
     }
+
+    public class Builder {
+        private var acc: IbanBic? = null
+        private var altAccs = mutableSetOf<IbanBic>()
+        private var amount: Amount? = null
+        private var currency: Currency? = null
+        private var dueDate: DueDate? = null
+        private var message: Message? = null
+        private var notificationType: NotificationType? = null
+        private var notificationAddress: NotificationAddress? = null
+        private var paymentType: PaymentType? = null
+        private var senderReference: SenderReference? = null
+        private var recipient: Recipient? = null
+        private var vs: VS? = null
+        private var ss: SS? = null
+        private var ks: KS? = null
+        private var retryDays: CzRetryDays? = null
+        private var paymentId: CzPaymentId? = null
+        private var url: URL? = null
+        private val customAttrs = mutableListOf<CustomAttribute>()
+
+        public fun account(account: IbanBic): Builder = apply { acc = account }
+        public fun altAccount(altAccount: IbanBic): Builder = apply { altAccs.add(altAccount) }
+        public fun amount(amount: Amount): Builder = apply { this.amount = amount }
+        public fun currency(currency: Currency): Builder = apply { this.currency = currency }
+        public fun dueDate(dueDate: DueDate): Builder = apply { this.dueDate = dueDate }
+        public fun message(message: Message): Builder = apply { this.message = message }
+        public fun notification(notificationType: NotificationType, notificationAddress: NotificationAddress): Builder =
+            apply {
+                this.notificationType = notificationType
+                this.notificationAddress = notificationAddress
+            }
+
+        public fun paymentType(paymentType: PaymentType): Builder = apply { this.paymentType = paymentType }
+        public fun senderReference(senderReference: SenderReference): Builder =
+            apply { this.senderReference = senderReference }
+
+        public fun recipient(recipient: Recipient): Builder = apply { this.recipient = recipient }
+        public fun vs(vs: VS): Builder = apply { this.vs = vs }
+        public fun ss(ss: SS): Builder = apply { this.ss = ss }
+        public fun ks(ks: KS): Builder = apply { this.ks = ks }
+        public fun retryDays(retryDays: CzRetryDays): Builder = apply { this.retryDays = retryDays }
+        public fun paymentId(paymentId: CzPaymentId): Builder = apply { this.paymentId = paymentId }
+        public fun url(url: URL): Builder = apply { this.url = url }
+        public fun customAttribute(customAttribute: CustomAttribute): Builder =
+            apply { customAttrs.add(customAttribute) }
+
+        public fun build(): Spayd {
+            val acc = acc ?: throw IllegalArgumentException("ACC: Account attribute is required.")
+
+            return Spayd(
+                Account(acc),
+                altAccs.takeIf { it.isNotEmpty() }?.toSet()?.let(::AltAccounts),
+                amount, currency, null, dueDate, message, notificationType, notificationAddress, paymentType,
+                senderReference, recipient, vs, ss, ks, retryDays, paymentId, url, customAttrs
+            )
+        }
+    }
 }
 
 internal interface SpaydAttribute {
@@ -123,19 +181,10 @@ public value class Account(public val value: IbanBic) : SpaydAttribute {
 }
 
 @JvmInline
-public value class AltAccounts(public val accounts: List<IbanBic>) : SpaydAttribute {
+public value class AltAccounts(public val accounts: Set<IbanBic>) : SpaydAttribute {
     override val key: String get() = "ALT-ACC"
 
     override fun encodedValue(optimizeForQr: Boolean): String = accounts.joinToString(",") { it.encodedValue() }
-
-    internal companion object {
-        @JvmStatic
-        fun fromString(value: String): AltAccounts = try {
-            AltAccounts(value.split(',').map(IbanBic::fromString))
-        } catch (e: IllegalArgumentException) {
-            throw IllegalArgumentException("Cannot parse ALT-ACC: ${e.message}", e)
-        }
-    }
 }
 
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
@@ -674,26 +723,11 @@ private fun decode(spayd: String): Spayd {
     val spayd = preprocessForDecoding(spayd)
     val parts = spayd.split('*').drop(2)
 
-    var acc: Account? = null
-    var altAccs: AltAccounts? = null
-    var amount: Amount? = null
-    var currency: Currency? = null
-    var crc32: CRC32? = null
-    var dueDate: DueDate? = null
-    var message: Message? = null
-    var notificationType: NotificationType? = null
-    var notificationAddress: NotificationAddress? = null
-    var paymentType: PaymentType? = null
-    var senderReference: SenderReference? = null
-    var recipient: Recipient? = null
-    var vs: VS? = null
-    var ss: SS? = null
-    var ks: KS? = null
-    var retryDays: CzRetryDays? = null
-    var paymentId: CzPaymentId? = null
-    var url: URL? = null
-
-    val customAttrs = mutableListOf<CustomAttribute>()
+    var receivedNt: String? = null
+    var receivedNta: String? = null
+    var receivedCrc32: String? = null
+    var receivedAltAccounts: List<IbanBic>? = null
+    val result = Spayd.Builder()
 
     for ((index, pair) in parts.withIndex()) {
         val kv = pair.split(':', limit = 2)
@@ -704,51 +738,48 @@ private fun decode(spayd: String): Spayd {
 
         // TODO SPAYD spec does not specify how duplicate keys should be handled. Therefore, last wins.
         when (key) {
-            "ACC" -> acc = Account.fromString(value)
-            "ALT-ACC" -> altAccs = AltAccounts.fromString(value)
-            "AM" -> amount = Amount.fromString(value)
-            "CC" -> currency = Currency.fromString(value)
-            "CRC32" -> crc32 = CRC32.fromString(value)
-            "DT" -> dueDate = DueDate.fromString(value)
-            "MSG" -> message = Message.fromString(value)
-            "NT" -> notificationType = parseNotificationType(value)
-            "NTA" -> notificationAddress = NotificationAddress.fromString(value)
-            "PT" -> paymentType = PaymentType.fromString(value)
-            "RF" -> senderReference = SenderReference.fromString(value)
-            "RN" -> recipient = Recipient.fromString(value)
+            "ACC" -> result.account(IbanBic.fromString(value))
+            "ALT-ACC" -> {
+                try {
+                    receivedAltAccounts = value.split(',').map(IbanBic::fromString)
+                } catch (e: IllegalArgumentException) {
+                    throw IllegalArgumentException("Cannot parse ALT-ACC: ${e.message}", e)
+                }
+            }
+
+            "AM" -> result.amount(Amount.fromString(value))
+            "CC" -> result.currency(Currency.fromString(value))
+            "CRC32" -> receivedCrc32 = value
+            "DT" -> result.dueDate(DueDate.fromString(value))
+            "MSG" -> result.message(Message.fromString(value))
+            "NT" -> receivedNt = value
+            "NTA" -> receivedNta = value
+            "PT" -> result.paymentType(PaymentType.fromString(value))
+            "RF" -> result.senderReference(SenderReference.fromString(value))
+            "RN" -> result.recipient(Recipient.fromString(value))
             // Czech extension attrs
-            "X-VS" -> vs = VS.fromString(value)
-            "X-SS" -> ss = SS.fromString(value)
-            "X-KS" -> ks = KS.fromString(value) // Az 10 symbolu pro jednoduchost, realne max 4 cislice
-            "X-PER" -> retryDays = CzRetryDays.fromString(value)
-            "X-ID" -> paymentId = CzPaymentId.fromString(value)
-            "X-URL" -> url = URL.fromString(value)
+            "X-VS" -> result.vs(VS.fromString(value))
+            "X-SS" -> result.ss(SS.fromString(value))
+            "X-KS" -> result.ks(KS.fromString(value)) // Az 10 symbolu pro jednoduchost, realne max 4 cislice
+            "X-PER" -> result.retryDays(CzRetryDays.fromString(value))
+            "X-ID" -> result.paymentId(CzPaymentId.fromString(value))
+            "X-URL" -> result.url(URL.fromString(value))
             // Unknown custom attributes
-            else -> customAttrs.add(CustomAttribute.create(key, value))
+            else -> result.customAttribute(CustomAttribute.create(key, value))
         }
     }
-    require(acc != null) { "Missing required attribute 'ACC'." }
-    return Spayd(
-        account = acc,
-        altAccounts = altAccs,
-        amount = amount,
-        currency = currency,
-        crc32 = crc32,
-        dueDate = dueDate,
-        message = message,
-        notificationType = notificationType,
-        notificationAddress = notificationAddress,
-        paymentType = paymentType,
-        senderReference = senderReference,
-        recipient = recipient,
-        vs = vs,
-        ss = ss,
-        ks = ks,
-        retryDays = retryDays,
-        paymentId = paymentId,
-        url = url,
-        customAttributes = customAttrs,
-    )
+    receivedAltAccounts?.forEach(result::altAccount)
+    when {
+        receivedNt != null && receivedNta != null -> {
+            result.notification(parseNotificationType(receivedNt), NotificationAddress.fromString(receivedNta))
+        }
+
+        receivedNt != null || receivedNta != null -> {
+            throw IllegalArgumentException("NT/NTA: Both NT and NTA attributes must be specified, or neither. Having just one makes no real sense")
+        }
+    }
+    // TODO check CRC32
+    return result.build()
 }
 
 private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): String {
