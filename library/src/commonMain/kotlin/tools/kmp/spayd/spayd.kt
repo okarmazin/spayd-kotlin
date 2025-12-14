@@ -831,13 +831,9 @@ private fun checkKey(index: Int, key: String) {
     }
 }
 
-private fun SpaydAttribute.encodeAsAttr(optimizeForQr: Boolean): String {
-    return "${key}:${encodedValue(optimizeForQr)}*"
-}
-
 private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
     append("SPD*1.0*")
-    val standardAttributes = listOfNotNull(
+    val attributes = listOfNotNull(
         spayd.account,
         spayd.altAccounts,
         spayd.amount,
@@ -856,17 +852,10 @@ private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
         spayd.retryDays,
         spayd.paymentId,
         spayd.url,
-    )
+    ) + spayd.customAttributes
 
-    for (attr in standardAttributes) {
-        append(attr.encodeAsAttr(optimizeForQr))
-    }
-
-    for (attr in spayd.customAttributes) {
-        append(attr.key)
-        append(':')
-        append(spaydPercentEncode(attr.value, optimizeForQr))
-        append('*')
+    for (attr in attributes) {
+        append("${attr.key}:${attr.encodedValue(optimizeForQr)}*")
     }
 }
 
