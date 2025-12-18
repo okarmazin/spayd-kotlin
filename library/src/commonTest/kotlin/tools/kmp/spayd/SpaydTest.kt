@@ -15,6 +15,9 @@ class SpaydTest {
     private val accBic = "ACC:$iban+$bic*"
     private val validFull = "$prefix${acc}AM:450.00*CC:CZK*MSG:PLATBA ZA ZBOZI*X-VS:1234567890"
 
+    private fun Spayd.Companion.decodeFromString(spayd: String): Spayd = Spayd.Decoder.Builder().build().decode(spayd)
+    private fun Spayd.encodeToString(optimizeForQr: Boolean): String =
+        Spayd.Encoder.Builder().optimizeForQr(optimizeForQr).build().encode(this)
     @Test
     fun testSplit() {
         assertContentEquals(

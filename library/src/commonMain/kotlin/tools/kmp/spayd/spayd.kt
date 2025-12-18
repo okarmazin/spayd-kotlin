@@ -44,7 +44,7 @@ public class Spayd private constructor(
 
     public val customAttributes: List<CustomAttribute>?,
 ) {
-    public fun encodeToString(optimizeForQr: Boolean): String = encode(this, optimizeForQr)
+    public companion object;
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -92,12 +92,6 @@ public class Spayd private constructor(
         result = 31 * result + url.hashCode()
         result = 31 * result + customAttributes.hashCode()
         return result
-    }
-
-    public companion object {
-        @Throws(IllegalArgumentException::class)
-        @JvmStatic
-        public fun decodeFromString(spaydString: String): Spayd = decode(spaydString)
     }
 
     public class Builder {
@@ -156,6 +150,30 @@ public class Spayd private constructor(
                 senderReference, recipient, vs, ss, ks, retryDays, paymentId, url,
                 customAttrs.takeIf { it.isNotEmpty() }
             )
+        }
+    }
+
+    public class Encoder private constructor(public val optimizeForQr: Boolean) {
+
+        @Throws(IllegalArgumentException::class)
+        public fun encode(spayd: Spayd): String = encode(spayd, optimizeForQr)
+
+        public class Builder {
+            private var optimizeForQr: Boolean = false
+
+            public fun optimizeForQr(optimizeForQr: Boolean): Builder = apply { this.optimizeForQr = optimizeForQr }
+
+            public fun build(): Encoder = Encoder(optimizeForQr)
+        }
+    }
+
+    public class Decoder private constructor() {
+
+        @Throws(IllegalArgumentException::class)
+        public fun decode(spayd: String): Spayd = decodeSpayd(spayd)
+
+        public class Builder {
+            public fun build(): Decoder = Decoder()
         }
     }
 }
@@ -674,7 +692,7 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
 }
 
 @Throws(IllegalArgumentException::class)
-private fun decode(spayd: String): Spayd {
+private fun decodeSpayd(spayd: String): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
     for ((index, char) in spayd.withIndex()) {
         if (char > '\u00FF') {
