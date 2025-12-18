@@ -177,20 +177,12 @@ class SpaydTest {
     }
 
     @Test
-    fun `test last wins when decoding`() {
+    fun `test duplicate error message`() {
         val string =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
-        val result = Spayd.decodeFromString(string)
-        assertEquals("CZ0608000000192235210247", result.account.iban.value)
-        assertContentEquals(
-            listOf("CZ9106000000000000000123"), // Last wins and it is deduplicated
-            result.altAccounts?.map { it.iban.value })
-        assertEquals("399.00", result.amount!!.value)
-        assertEquals("CZK", result.currency!!.code)
-        assertEquals("T-Mobile Czech Republic a.s.", result.recipient?.value)
-        assertEquals("1113334445", result.vs!!.value)
-        assertEquals("11", result.ss!!.value)
-        assertEquals("T-Mobile - QR platba123áé ‰*", result.message!!.value)
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:123*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a*X-CUSTOM:456*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123"
+
+        val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(string) }
+        assertEquals("Duplicate keys found: [ALT-ACC: at indexes 1, 10; X-CUSTOM: at indexes 5, 9]", ex.message)
     }
 
     @Test

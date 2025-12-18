@@ -688,6 +688,22 @@ public data class CustomAttribute private constructor(override val key: String, 
     }
 }
 
+private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
+    companion object Companion {
+        fun fromIndexedValue(value: IndexedValue<String>): ParsedSpaydEntry {
+            val parts = value.value.split(':', limit = 2)
+            require(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
+            checkKey(value.index, parts[0])
+            val decoded = try {
+                spaydPercentDecode(parts[1])
+            } catch (e: IllegalArgumentException) {
+                throw IllegalArgumentException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
+            }
+            return ParsedSpaydEntry(index = value.index, key = parts[0], percentDecodedValue = decoded)
+        }
+    }
+}
+
 @Throws(IllegalArgumentException::class)
 private fun decode(spayd: String): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
@@ -699,7 +715,16 @@ private fun decode(spayd: String): Spayd {
     val basicRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
     require(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
     val spayd = preprocessForDecoding(spayd)
-    val parts = spayd.split('*').drop(2)
+    val spaydEntries = spayd.split('*').drop(2).withIndex().map(ParsedSpaydEntry::fromIndexedValue)
+    val duplicates = spaydEntries.groupBy { it.key }.filter { it.value.size > 1 }
+    require(duplicates.isEmpty()) {
+        val report = duplicates.entries.joinToString(
+            separator = "; ",
+            prefix = "[",
+            postfix = "]"
+        ) { (key, values) -> "$key: at indexes ${values.joinToString { it.index.toString() }}" }
+        "Duplicate keys found: $report"
+    }
 
     var receivedNt: String? = null
     var receivedNta: String? = null
@@ -707,15 +732,9 @@ private fun decode(spayd: String): Spayd {
     var receivedAltAccounts: List<IbanBic>? = null
     val result = Spayd.Builder()
 
-    for ((index, pair) in parts.withIndex()) {
-        val kv = pair.split(':', limit = 2)
-        require(kv.size == 2) { "Invalid key-value pair at index $index: missing ':' delimiter." }
-        checkKey(index, kv[0])
-        val key = kv[0]
-        val value = spaydPercentDecode(kv[1])
-
-        // TODO SPAYD spec does not specify how duplicate keys should be handled. Therefore, last wins.
-        when (key) {
+    for (entry in spaydEntries) {
+        val value = entry.percentDecodedValue
+        when (entry.key) {
             "ACC" -> result.account(IbanBic.fromString(value))
             "ALT-ACC" -> {
                 try {
@@ -743,7 +762,7 @@ private fun decode(spayd: String): Spayd {
             "X-ID" -> result.paymentId(CzPaymentId.fromString(value))
             "X-URL" -> result.url(URL.fromString(value))
             // Unknown custom attributes
-            else -> result.customAttribute(CustomAttribute.create(key, value))
+            else -> result.customAttribute(CustomAttribute.create(entry.key, value))
         }
     }
     receivedAltAccounts?.forEach(result::altAccount)
