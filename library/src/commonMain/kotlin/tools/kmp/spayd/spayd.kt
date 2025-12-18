@@ -499,6 +499,14 @@ public enum class NotificationType : SpaydAttribute {
         PHONE -> "P"
         EMAIL -> "E"
     }
+
+    public companion object {
+        internal fun fromString(value: String): NotificationType = when (value) {
+            "P" -> PHONE
+            "E" -> EMAIL
+            else -> throw IllegalArgumentException("NT: Invalid notification type. Must be one of [P, E]")
+        }
+    }
 }
 
 @JvmInline
@@ -768,7 +776,7 @@ private fun decode(spayd: String): Spayd {
     receivedAltAccounts?.forEach(result::altAccount)
     when {
         receivedNt != null && receivedNta != null -> {
-            result.notification(parseNotificationType(receivedNt), NotificationAddress.fromString(receivedNta))
+            result.notification(NotificationType.fromString(receivedNt), NotificationAddress.fromString(receivedNta))
         }
 
         receivedNt != null || receivedNta != null -> {
@@ -794,14 +802,6 @@ private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): Stri
     }
 
     return spayd
-}
-
-private fun parseNotificationType(value: String): NotificationType {
-    return when (value) {
-        "P" -> NotificationType.PHONE
-        "E" -> NotificationType.EMAIL
-        else -> throw IllegalArgumentException("NT: Invalid notification type. Must be one of [P, E]")
-    }
 }
 
 @Suppress("NOTHING_TO_INLINE")
