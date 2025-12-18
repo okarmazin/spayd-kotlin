@@ -156,7 +156,71 @@ public class Spayd private constructor(
     public class Encoder private constructor(public val optimizeForQr: Boolean) {
 
         @Throws(IllegalArgumentException::class)
-        public fun encode(spayd: Spayd): String = encode(spayd, optimizeForQr)
+        public fun encode(spayd: Spayd): String = buildString {
+            append("SPD*1.0*")
+            append("ACC:${spayd.account.encode()}*")
+            if (!spayd.altAccounts.isNullOrEmpty()) {
+                append("ALT-ACC:${spayd.altAccounts.joinToString(",") { it.encode() }}*")
+            }
+            if (spayd.amount != null) append("AM:${spayd.amount.encode()}*")
+            if (spayd.currency != null) append("CC:${spayd.currency.encode()}*")
+            if (spayd.dueDate != null) append("DT:${spayd.dueDate.encode()}*")
+            if (spayd.message != null) append("MSG:${spayd.message.encode(optimizeForQr)}*")
+            if (spayd.notificationType != null) append("NT:${spayd.notificationType.encode()}*")
+            if (spayd.notificationAddress != null) {
+                append("NTA:${spayd.notificationAddress.encode(optimizeForQr)}*")
+            }
+            if (spayd.paymentType != null) append("PT:${spayd.paymentType.encode()}*")
+            if (spayd.senderReference != null) append("RF:${spayd.senderReference.encode(optimizeForQr)}*")
+            if (spayd.recipient != null) append("RN:${spayd.recipient.encode(optimizeForQr)}*")
+            if (spayd.vs != null) append("X-VS:${spayd.vs.encode()}*")
+            if (spayd.ss != null) append("X-SS:${spayd.ss.encode()}*")
+            if (spayd.ks != null) append("X-KS:${spayd.ks.encode()}*")
+            if (spayd.retryDays != null) append("X-PER:${spayd.retryDays.encode()}*")
+            if (spayd.paymentId != null) append("X-ID:${spayd.paymentId.encode(optimizeForQr)}*")
+            if (spayd.url != null) append("X-URL:${spayd.url.encode(optimizeForQr)}*")
+
+            for (attr in spayd.customAttributes.orEmpty()) {
+                append("${attr.key}:${attr.encode(optimizeForQr)}*")
+            }
+        }
+
+        private inline fun Amount.encode(): String = value
+        private inline fun Currency.encode(): String = code.uppercase()
+        private inline fun Message.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+        private inline fun Recipient.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+        private inline fun VS.encode(): String = value
+        private inline fun SS.encode(): String = value
+        private inline fun KS.encode(): String = value
+        private inline fun CzRetryDays.encode(): String = value.toString()
+        private inline fun CzPaymentId.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+        private inline fun URL.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+        private inline fun IbanBic.encode(): String {
+            val content = iban.value + (bic?.value?.let { "+$it" } ?: "")
+            return spaydPercentEncode(content, true)
+        }
+
+        private inline fun DueDate.encode(): String =
+            "$year${monthNumber.toString().padStart(2, '0')}${dayOfMonth.toString().padStart(2, '0')}"
+
+        private inline fun NotificationType.encode(): String = when (this) {
+            NotificationType.PHONE -> "P"
+            NotificationType.EMAIL -> "E"
+        }
+
+        private inline fun NotificationAddress.encode(optimizeForQr: Boolean): String =
+            spaydPercentEncode(value, optimizeForQr)
+
+        private inline fun PaymentType.encode(): String = when (this) {
+            is PaymentType.Custom -> value.uppercase()
+            PaymentType.InstantPayment -> "IP"
+        }
+
+        private inline fun SenderReference.encode(optimizeForQr: Boolean): String =
+            spaydPercentEncode(value, optimizeForQr)
+
+        private inline fun CustomAttribute.encode(optimizeForQr: Boolean): String =
+            spaydPercentEncode(value, optimizeForQr)
 
         public class Builder {
             private var optimizeForQr: Boolean = false
@@ -179,11 +243,6 @@ public class Spayd private constructor(
 }
 
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
-    internal fun encodedValue(): String {
-        val content = iban.value + (bic?.value?.let { "+$it" } ?: "")
-        return spaydPercentEncode(content, true)
-    }
-
     internal companion object {
         @JvmStatic
         fun fromString(value: String): IbanBic {
@@ -374,8 +433,6 @@ public data class BankCode private constructor(val value: String) {
 
 @JvmInline
 public value class Amount private constructor(public val value: String) {
-    internal fun encodedValue(): String = value
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): Amount {
@@ -395,8 +452,6 @@ public value class Amount private constructor(public val value: String) {
 
 @JvmInline
 public value class Currency private constructor(public val code: String) {
-    internal fun encodedValue(): String = code.uppercase()
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): Currency {
@@ -429,9 +484,6 @@ public value class CRC32 private constructor(public val value: String) {
 
 @ConsistentCopyVisibility
 public data class DueDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
-    internal fun encodedValue(): String =
-        "$year${monthNumber.toString().padStart(2, '0')}${dayOfMonth.toString().padStart(2, '0')}"
-
     /**
      * ISO 8601 format: YYYY-MM-DD
      */
@@ -475,8 +527,6 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
 
 @JvmInline
 public value class Message private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         public val MAX_LENGTH: Int = 60
 
@@ -495,11 +545,6 @@ public enum class NotificationType {
     /** NT:E */
     EMAIL;
 
-    internal fun encodedValue(): String = when (this) {
-        PHONE -> "P"
-        EMAIL -> "E"
-    }
-
     public companion object {
         internal fun fromString(value: String): NotificationType = when (value) {
             "P" -> PHONE
@@ -511,8 +556,6 @@ public enum class NotificationType {
 
 @JvmInline
 public value class NotificationAddress private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         public const val MAX_LENGTH: Int = 320
 
@@ -525,11 +568,6 @@ public value class NotificationAddress private constructor(public val value: Str
 }
 
 public sealed class PaymentType {
-    internal fun encodedValue(): String = when (this) {
-        is Custom -> value.uppercase()
-        InstantPayment -> "IP"
-    }
-
     /**
      * PT:IP
      *
@@ -553,8 +591,6 @@ public sealed class PaymentType {
 
 @JvmInline
 public value class SenderReference private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): SenderReference {
@@ -568,8 +604,6 @@ public value class SenderReference private constructor(public val value: String)
 
 @JvmInline
 public value class Recipient private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         public const val MAX_LENGTH: Int = 35
 
@@ -582,8 +616,6 @@ public value class Recipient private constructor(public val value: String) {
 
 @JvmInline
 public value class VS private constructor(public val value: String) {
-    internal fun encodedValue(): String = value
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): VS {
@@ -595,8 +627,6 @@ public value class VS private constructor(public val value: String) {
 
 @JvmInline
 public value class SS private constructor(public val value: String) {
-    internal fun encodedValue(): String = value
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): SS {
@@ -608,8 +638,6 @@ public value class SS private constructor(public val value: String) {
 
 @JvmInline
 public value class KS private constructor(public val value: String) {
-    internal fun encodedValue(): String = value
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): KS {
@@ -621,8 +649,6 @@ public value class KS private constructor(public val value: String) {
 
 @JvmInline
 public value class CzRetryDays private constructor(public val value: Int) {
-    internal fun encodedValue(): String = value.toString()
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): CzRetryDays {
@@ -636,8 +662,6 @@ public value class CzRetryDays private constructor(public val value: Int) {
 
 @JvmInline
 public value class CzPaymentId private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         @JvmStatic
         public fun fromString(value: String): CzPaymentId {
@@ -649,8 +673,6 @@ public value class CzPaymentId private constructor(public val value: String) {
 
 @JvmInline
 public value class URL private constructor(public val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         public const val MAX_LENGTH: Int = 140
 
@@ -664,8 +686,6 @@ public value class URL private constructor(public val value: String) {
 
 @ConsistentCopyVisibility
 public data class CustomAttribute private constructor(val key: String, val value: String) {
-    internal fun encodedValue(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
-
     public companion object {
         @JvmStatic
         public fun create(key: String, value: String): CustomAttribute {
@@ -806,34 +826,6 @@ private fun checkKey(index: Int, key: String) {
         // TODO Emit a warning if configured
     }
 }
-
-private fun encode(spayd: Spayd, optimizeForQr: Boolean): String = buildString {
-    append("SPD*1.0*")
-    append("ACC:${spayd.account.encodedValue()}*")
-    if (!spayd.altAccounts.isNullOrEmpty()) {
-        append("ALT-ACC:${spayd.altAccounts.joinToString(",") { it.encodedValue() }}*")
-    }
-    if (spayd.amount != null) append("AM:${spayd.amount.encodedValue()}*")
-    if (spayd.currency != null) append("CC:${spayd.currency.encodedValue()}*")
-    if (spayd.dueDate != null) append("DT:${spayd.dueDate.encodedValue()}*")
-    if (spayd.message != null) append("MSG:${spayd.message.encodedValue(optimizeForQr)}*")
-    if (spayd.notificationType != null) append("NT:${spayd.notificationType.encodedValue()}*")
-    if (spayd.notificationAddress != null) append("NTA:${spayd.notificationAddress.encodedValue(optimizeForQr)}*")
-    if (spayd.paymentType != null) append("PT:${spayd.paymentType.encodedValue()}*")
-    if (spayd.senderReference != null) append("RF:${spayd.senderReference.encodedValue(optimizeForQr)}*")
-    if (spayd.recipient != null) append("RN:${spayd.recipient.encodedValue(optimizeForQr)}*")
-    if (spayd.vs != null) append("X-VS:${spayd.vs.encodedValue()}*")
-    if (spayd.ss != null) append("X-SS:${spayd.ss.encodedValue()}*")
-    if (spayd.ks != null) append("X-KS:${spayd.ks.encodedValue()}*")
-    if (spayd.retryDays != null) append("X-PER:${spayd.retryDays.encodedValue()}*")
-    if (spayd.paymentId != null) append("X-ID:${spayd.paymentId.encodedValue(optimizeForQr)}*")
-    if (spayd.url != null) append("X-URL:${spayd.url.encodedValue(optimizeForQr)}*")
-
-    for (attr in spayd.customAttributes.orEmpty()) {
-        append("${attr.key}:${attr.encodedValue(optimizeForQr)}*")
-    }
-}
-
 
 private val spaydAllowedChars: Set<Char> =
     ('\u0000'..'\u007F')
