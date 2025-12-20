@@ -156,7 +156,10 @@ public class Spayd private constructor(
     }
 
     @Suppress("NOTHING_TO_INLINE")
-    public class Encoder private constructor(public val optimizeForQr: Boolean) {
+    public class Encoder private constructor(
+        public val optimizeForQr: Boolean,
+        public val logger: Logger?,
+    ) {
 
         @Throws(IllegalArgumentException::class)
         public fun encode(spayd: Spayd): String = buildString {
@@ -226,21 +229,50 @@ public class Spayd private constructor(
             spaydPercentEncode(value, optimizeForQr)
 
         public class Builder {
+            private var logger: Logger? = null
             private var optimizeForQr: Boolean = false
 
+            public fun logger(logger: Logger?): Builder = apply { this.logger = logger }
             public fun optimizeForQr(optimizeForQr: Boolean): Builder = apply { this.optimizeForQr = optimizeForQr }
 
-            public fun build(): Encoder = Encoder(optimizeForQr)
+            public fun build(): Encoder = Encoder(optimizeForQr, logger)
         }
     }
 
-    public class Decoder private constructor() {
+    public class Decoder private constructor(
+        public val logger: Logger? = null,
+    ) {
 
         @Throws(IllegalArgumentException::class)
         public fun decode(spayd: String): Spayd = decodeSpayd(spayd)
 
         public class Builder {
+            private var logger: Logger? = null
+
+            public fun logger(logger: Logger?): Builder = apply { this.logger = logger }
+
             public fun build(): Decoder = Decoder()
+        }
+    }
+}
+
+public interface Logger {
+    public fun debug(message: String, throwable: Throwable? = null)
+    public fun info(message: String, throwable: Throwable? = null)
+    public fun warn(message: String, throwable: Throwable? = null)
+    public fun error(message: String, throwable: Throwable? = null)
+
+    public companion object {
+        public val PRINTLN: Logger = object : Logger {
+            private fun log(prefix: String, message: String, throwable: Throwable?) {
+                val throwableMessage = throwable?.let { "\n${it.stackTraceToString()}" } ?: ""
+                println("$message $throwableMessage")
+            }
+
+            override fun debug(message: String, throwable: Throwable?): Unit = log("[DEBUG]", message, throwable)
+            override fun info(message: String, throwable: Throwable?): Unit = log("[INFO]", message, throwable)
+            override fun warn(message: String, throwable: Throwable?): Unit = log("[WARN]", message, throwable)
+            override fun error(message: String, throwable: Throwable?): Unit = log("[ERROR]", message, throwable)
         }
     }
 }
