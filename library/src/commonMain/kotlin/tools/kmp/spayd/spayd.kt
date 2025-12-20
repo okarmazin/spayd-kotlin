@@ -434,18 +434,28 @@ public data class BankCode private constructor(val value: String) {
 @JvmInline
 public value class Amount private constructor(public val value: String) {
     public companion object {
+        // @formatter:off
+        public const val ERR_NAN: String = "AM: Amount must not be empty and must only contain digits or up to 1 decimal point. Negative amounts are not allowed."
+        public const val ERR_SINGLE_DECIMAL_POINT: String = "AM: Input must not be a single decimal point '.': While this could be interpreted as a zero decimal amount, it is ambiguous and no reasonable string representation of a decimal number would output this. Leading decimal point is only allowed if it is followed by at least 1 digit."
+        public const val ERR_TOO_MANY_DECIMALS: String = "AM: Amount must have at most 2 decimal places."
+        public const val ERR_TOO_LONG: String = "AM: Amount must be 1 to 10 characters after normalization. SPAYD requires 1..10 characters including the decimal point and decimal expansion i.e. <10>, <8>.<1>, <7>.<2>"
+        // @formatter:on
+
         @JvmStatic
         public fun fromString(value: String): Amount {
-            require(value.length in 1..10 && value != ".") { "AM: Amount must not exceed 10 characters and must have at least 1 digit" }
-            require(value.all { isAsciiDigit(it) || it == '.' }) { "AM: Amount must contain only digits or a decimal point" }
+            val isNumber = value.isNotEmpty() && value.all { isAsciiDigit(it) || it == '.' }
+            require(isNumber) { ERR_NAN }
+            require(value != ".") { ERR_SINGLE_DECIMAL_POINT }
             val parts = value.split('.')
-            require(parts.size <= 2) { "AM: Amount must contain at most one decimal point" }
-            val integerPart = parts[0].padStart(1, '0')
-            val decimalPart = parts.getOrNull(1).orEmpty()
+            require(parts.size <= 2) { ERR_NAN }
+            val integerPart = parts[0].dropWhile { it == '0' }.ifEmpty { "0" }
+            val decimalPart = parts.getOrNull(1).orEmpty().dropLastWhile { it == '0' }
 
-            require(decimalPart.length <= 2) { "AM: Amount must be a decimal number with at most 2 decimal places." }
-
-            return Amount("$integerPart.${decimalPart.padEnd(2, '0')}")
+            require(decimalPart.length <= 2) { ERR_TOO_MANY_DECIMALS }
+            val decimalSuffix = if (decimalPart.isEmpty()) "" else ".$decimalPart"
+            val normalized = "$integerPart$decimalSuffix"
+            require(normalized.length in 1..10) { ERR_TOO_LONG }
+            return Amount(integerPart + decimalSuffix)
         }
     }
 }

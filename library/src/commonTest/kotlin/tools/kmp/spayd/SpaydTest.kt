@@ -171,7 +171,7 @@ class SpaydTest {
         assertContentEquals(
             listOf("CZ9003000000192235210247", "CZ4601000000192235210247"),
             result.altAccounts?.map { it.iban.value })
-        assertEquals("399.00", result.amount!!.value)
+        assertEquals("399", result.amount!!.value)
         assertEquals("CZK", result.currency!!.code)
         assertEquals("T-Mobile Czech Republic a.s.", result.recipient?.value)
         assertEquals("1113334445", result.vs!!.value)
@@ -194,7 +194,7 @@ class SpaydTest {
             .account(IbanBic.fromString("CZ0608000000192235210247"))
             .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
             .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
-            .amount(Amount.fromString("399.00"))
+            .amount(Amount.fromString("399.01"))
             .currency(Currency.fromString("CZK"))
             .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
             .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
@@ -203,11 +203,11 @@ class SpaydTest {
             .build()
 
         val expectedUnoptimized =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.00*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*"
         assertEquals(expectedUnoptimized, spayd.encodeToString(false))
 
         val expectedOptimized =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.00*CC:CZK*MSG:T-MOBILE - QR PLATBA123%C3%81%C3%89 %E2%80%B0%2A*RN:T-MOBILE CZECH REPUBLIC A.S.*X-VS:1113334445*X-SS:11*"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-MOBILE - QR PLATBA123%C3%81%C3%89 %E2%80%B0%2A*RN:T-MOBILE CZECH REPUBLIC A.S.*X-VS:1113334445*X-SS:11*"
         assertEquals(expectedOptimized, spayd.encodeToString(true))
     }
 
