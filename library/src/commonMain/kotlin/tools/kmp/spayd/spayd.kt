@@ -267,7 +267,7 @@ public interface Logger {
         public val PRINTLN: Logger = object : Logger {
             private fun log(prefix: String, message: String, throwable: Throwable?) {
                 val throwableMessage = throwable?.let { "\n${it.stackTraceToString()}" } ?: ""
-                println("$message $throwableMessage")
+                println("$prefix $message$throwableMessage")
             }
 
             override fun debug(message: String, throwable: Throwable?): Unit = log("[DEBUG]", message, throwable)
