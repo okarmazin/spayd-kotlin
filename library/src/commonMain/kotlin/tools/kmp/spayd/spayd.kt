@@ -472,23 +472,6 @@ public value class Currency private constructor(public val code: String) {
     }
 }
 
-@JvmInline
-public value class CRC32 private constructor(public val value: String) {
-    public companion object {
-        private const val LENGTH: Int = 8
-        private val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
-
-        @JvmStatic
-        public fun fromString(value: String): CRC32 {
-            require(value.length == LENGTH && value.all { it in hexDigits }) {
-                "CRC32: CRC32 must be exactly $LENGTH hexadecimal digits."
-            }
-
-            return CRC32(value)
-        }
-    }
-}
-
 @ConsistentCopyVisibility
 public data class DueDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
     /**
