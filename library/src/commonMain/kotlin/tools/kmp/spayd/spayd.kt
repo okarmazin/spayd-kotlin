@@ -846,12 +846,8 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     return result.build()
 }
 
-private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): String {
-    // TODO remove lenient param
+private fun preprocessForDecoding(spayd: String): String {
     var spayd = spayd
-    if (lenient) {
-        spayd = spayd.trim()
-    }
 
     // Kotlin split produces an empty String if the value ends with the delimiter.
     // SPAYD spec states that all key-value pairs end with a '*'.
