@@ -538,7 +538,7 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
 @JvmInline
 public value class Message private constructor(public val value: String) {
     public companion object {
-        public val MAX_LENGTH: Int = 60
+        public const val MAX_LENGTH: Int = 60
 
         @JvmStatic
         public fun fromString(value: String): Message {
