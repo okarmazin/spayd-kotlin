@@ -165,31 +165,35 @@ public class Spayd private constructor(
         @Throws(SpaydException::class)
         public fun encode(spayd: Spayd): String = buildString {
             append("SPD*1.0*")
-            append("ACC:${spayd.account.encode()}*")
+            val parts = mutableListOf<Pair<String, String>>()
+            parts.add("ACC" to spayd.account.encode())
             if (!spayd.altAccounts.isNullOrEmpty()) {
-                append("ALT-ACC:${spayd.altAccounts.joinToString(",") { it.encode() }}*")
+                parts.add("ALT-ACC" to spayd.altAccounts.joinToString(",") { it.encode() })
             }
-            if (spayd.amount != null) append("AM:${spayd.amount.encode()}*")
-            if (spayd.currency != null) append("CC:${spayd.currency.encode()}*")
-            if (spayd.dueDate != null) append("DT:${spayd.dueDate.encode()}*")
-            if (spayd.message != null) append("MSG:${spayd.message.encode(optimizeForQr)}*")
-            if (spayd.notificationType != null) append("NT:${spayd.notificationType.encode()}*")
+            if (spayd.amount != null) parts.add("AM" to spayd.amount.encode())
+            if (spayd.currency != null) parts.add("CC" to spayd.currency.encode())
+            if (spayd.dueDate != null) parts.add("DT" to spayd.dueDate.encode())
+            if (spayd.message != null) parts.add("MSG" to spayd.message.encode(optimizeForQr))
+            if (spayd.notificationType != null) parts.add("NT" to spayd.notificationType.encode())
             if (spayd.notificationAddress != null) {
-                append("NTA:${spayd.notificationAddress.encode(optimizeForQr)}*")
+                parts.add("NTA" to spayd.notificationAddress.encode(optimizeForQr))
             }
-            if (spayd.paymentType != null) append("PT:${spayd.paymentType.encode()}*")
-            if (spayd.senderReference != null) append("RF:${spayd.senderReference.encode(optimizeForQr)}*")
-            if (spayd.recipient != null) append("RN:${spayd.recipient.encode(optimizeForQr)}*")
-            if (spayd.vs != null) append("X-VS:${spayd.vs.encode()}*")
-            if (spayd.ss != null) append("X-SS:${spayd.ss.encode()}*")
-            if (spayd.ks != null) append("X-KS:${spayd.ks.encode()}*")
-            if (spayd.retryDays != null) append("X-PER:${spayd.retryDays.encode()}*")
-            if (spayd.paymentId != null) append("X-ID:${spayd.paymentId.encode(optimizeForQr)}*")
-            if (spayd.url != null) append("X-URL:${spayd.url.encode(optimizeForQr)}*")
+            if (spayd.paymentType != null) parts.add("PT" to spayd.paymentType.encode())
+            if (spayd.senderReference != null) parts.add("RF" to spayd.senderReference.encode(optimizeForQr))
+            if (spayd.recipient != null) parts.add("RN" to spayd.recipient.encode(optimizeForQr))
+            if (spayd.vs != null) parts.add("X-VS" to spayd.vs.encode())
+            if (spayd.ss != null) parts.add("X-SS" to spayd.ss.encode())
+            if (spayd.ks != null) parts.add("X-KS" to spayd.ks.encode())
+            if (spayd.retryDays != null) parts.add("X-PER" to spayd.retryDays.encode())
+            if (spayd.paymentId != null) parts.add("X-ID" to spayd.paymentId.encode(optimizeForQr))
+            if (spayd.url != null) parts.add("X-URL" to spayd.url.encode(optimizeForQr))
 
             for (attr in spayd.customAttributes.orEmpty()) {
-                append("${attr.key}:${attr.encode(optimizeForQr)}*")
+                parts.add(attr.key to attr.encode(optimizeForQr))
             }
+            parts.sortWith(compareBy({ it.first }, { it.second }))
+            logger?.debug("Sorted attributes: $parts")
+            append(parts.joinToString("") { "${it.first}:${it.second}*" })
         }
 
         private inline fun Amount.encode(): String = value

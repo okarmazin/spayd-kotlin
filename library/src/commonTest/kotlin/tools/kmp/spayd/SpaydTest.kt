@@ -19,7 +19,7 @@ class SpaydTest {
         Spayd.Decoder.Builder().logger(Logger.PRINTLN).build().decode(spayd)
 
     private fun Spayd.encodeToString(optimizeForQr: Boolean): String =
-        Spayd.Encoder.Builder().optimizeForQr(optimizeForQr).build().encode(this)
+        Spayd.Encoder.Builder().logger(Logger.PRINTLN).optimizeForQr(optimizeForQr).build().encode(this)
 
     @Test
     fun testSplit() {
@@ -199,23 +199,26 @@ class SpaydTest {
     @Test
     fun `test real spayd encode`() {
         val spayd = Spayd.Builder()
-            .account(IbanBic.fromString("CZ0608000000192235210247"))
             .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
             .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
             .amount(Amount.fromString("399.01"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
             .currency(Currency.fromString("CZK"))
             .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
             .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
             .vs(VS.fromString("1113334445"))
             .ss(SS.fromString("11"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
+            .account(IbanBic.fromString("CZ0608000000192235210247"))
             .build()
 
         val expectedUnoptimized =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:ayyy*X-CUSTOM:ayyyy*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*"
         assertEquals(expectedUnoptimized, spayd.encodeToString(false))
 
         val expectedOptimized =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-MOBILE - QR PLATBA123%C3%81%C3%89 %E2%80%B0%2A*RN:T-MOBILE CZECH REPUBLIC A.S.*X-VS:1113334445*X-SS:11*"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-MOBILE - QR PLATBA123%C3%81%C3%89 %E2%80%B0%2A*RN:T-MOBILE CZECH REPUBLIC A.S.*X-CUSTOM:AYYY*X-CUSTOM:AYYYY*X-CUSTOM:ORANG UTAN*X-SS:11*X-VS:1113334445*"
         assertEquals(expectedOptimized, spayd.encodeToString(true))
     }
 
