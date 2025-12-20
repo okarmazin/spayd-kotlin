@@ -744,9 +744,12 @@ public value class URL private constructor(public val value: String) {
 @ConsistentCopyVisibility
 public data class CustomAttribute private constructor(val key: String, val value: String) {
     public companion object {
+        public val reservedKeys: Set<String> = setOf("X-VS", "X-SS", "X-KS", "X-PER", "X-ID", "X-URL")
+
         @JvmStatic
         @Throws(SpaydException::class)
         public fun create(key: String, value: String): CustomAttribute {
+            req(key !in reservedKeys) { "Custom attribute key '$key' is reserved. Please use a different key for your own attribute." }
             req(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
             return CustomAttribute(key, value)
         }

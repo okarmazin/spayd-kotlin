@@ -219,4 +219,17 @@ class SpaydTest {
         assertEquals(expectedOptimized, spayd.encodeToString(true))
     }
 
+    @Test
+    fun `custom attribute rejects reserved prefix`() {
+        for (reserved in CustomAttribute.reservedKeys) {
+            val ex = assertFailsWith<SpaydException> {
+                CustomAttribute.create(reserved, "value")
+            }
+            assertEquals(
+                "Custom attribute key '$reserved' is reserved. Please use a different key for your own attribute.",
+                ex.message
+            )
+        }
+    }
+
 }
