@@ -244,7 +244,7 @@ public class Spayd private constructor(
     ) {
 
         @Throws(IllegalArgumentException::class)
-        public fun decode(spayd: String): Spayd = decodeSpayd(spayd)
+        public fun decode(spayd: String): Spayd = decodeSpayd(spayd, logger)
 
         public class Builder {
             private var logger: Logger? = null
@@ -721,10 +721,10 @@ public data class CustomAttribute private constructor(val key: String, val value
 
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object Companion {
-        fun fromIndexedValue(value: IndexedValue<String>): ParsedSpaydEntry {
+        fun fromIndexedValue(value: IndexedValue<String>, logger: Logger?): ParsedSpaydEntry {
             val parts = value.value.split(':', limit = 2)
             require(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
-            checkKey(value.index, parts[0])
+            checkKey(value.index, parts[0], logger)
             val decoded = try {
                 spaydPercentDecode(parts[1])
             } catch (e: IllegalArgumentException) {
@@ -736,7 +736,7 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
 }
 
 @Throws(IllegalArgumentException::class)
-private fun decodeSpayd(spayd: String): Spayd {
+private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
     for ((index, char) in spayd.withIndex()) {
         if (char > '\u00FF') {
@@ -746,7 +746,7 @@ private fun decodeSpayd(spayd: String): Spayd {
     val basicRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
     require(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
     val spayd = preprocessForDecoding(spayd)
-    val spaydEntries = spayd.split('*').drop(2).withIndex().map(ParsedSpaydEntry::fromIndexedValue)
+    val spaydEntries = spayd.split('*').drop(2).withIndex().map { ParsedSpaydEntry.fromIndexedValue(it, logger) }
     val duplicates = spaydEntries.groupBy { it.key }.filter { it.value.size > 1 }
     require(duplicates.isEmpty()) {
         val report = duplicates.entries.joinToString(
@@ -836,7 +836,7 @@ private inline fun isAsciiDigits(string: String): Boolean = string.all(::isAscii
 private val predefinedKeys =
     setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
 
-private fun checkKey(index: Int, key: String) {
+private fun checkKey(index: Int, key: String, logger: Logger?) {
     val validChars = ('A'..'Z') + '-'
     for ((cindex, c) in key.withIndex()) {
         require(c in validChars) {
@@ -846,8 +846,7 @@ private fun checkKey(index: Int, key: String) {
 
     require(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
     if (key.contains("--")) {
-        // While allowed by the spec, this is weird. 'X--', 'X-ABC--DEF'
-        // TODO Emit a warning if configured
+        logger?.warn("User-defined key '$key' contains '--'. This is allowed but suspicious.")
     }
 }
 
