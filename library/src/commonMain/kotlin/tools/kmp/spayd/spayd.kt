@@ -153,6 +153,7 @@ public class Spayd private constructor(
         }
     }
 
+    @Suppress("NOTHING_TO_INLINE")
     public class Encoder private constructor(public val optimizeForQr: Boolean) {
 
         @Throws(IllegalArgumentException::class)
