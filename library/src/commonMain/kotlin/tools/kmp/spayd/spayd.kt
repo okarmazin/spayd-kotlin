@@ -756,6 +756,8 @@ public data class CustomAttribute private constructor(val key: String, val value
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object {
         fun fromIndexedValue(value: IndexedValue<String>, logger: Logger?): ParsedSpaydEntry {
+            // specialized message for empty values, it is more informative than "missing delimiter"
+            req(value.value.isNotEmpty()) { "Key-value pair at index ${value.index} is empty (**)" }
             val parts = value.value.split(':', limit = 2)
             req(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
             checkKey(value.index, parts[0], logger)
@@ -851,7 +853,7 @@ private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): Stri
         spayd = spayd.trim()
     }
 
-    // Kotlin split produces en empty String if the value ends with the delimiter.
+    // Kotlin split produces an empty String if the value ends with the delimiter.
     // SPAYD spec states that all key-value pairs end with a '*'.
     // Therefore, a compliant string will always end with a star.
     // In reality, SPAYD generators often omit the ending delimiter.

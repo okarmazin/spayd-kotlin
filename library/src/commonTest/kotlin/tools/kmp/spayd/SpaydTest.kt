@@ -101,6 +101,11 @@ class SpaydTest {
     @Test
     fun `test missing colon delimiter in key-value pairs`() {
         run {
+            val emptyPair = "SPD*1.0*ACC:CZ0608000000192235210247**"
+            val exception = assertFailsWith<SpaydException> { Spayd.decodeFromString(emptyPair) }
+            assertEquals("Key-value pair at index 1 is empty (**)", exception.message)
+        }
+        run {
             val cases = listOf("SPD*1.0*ACC", "SPD*1.0*ACC*")
             for (case in cases) {
                 val exception = assertFailsWith<SpaydException> { Spayd.decodeFromString(case) }
