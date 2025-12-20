@@ -252,8 +252,6 @@ public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
             val bic = parts.getOrNull(1)
             return IbanBic(IBAN.fromString(iban), bic?.let(BIC::fromString))
         }
-
-        internal fun fromParts(iban: IBAN, bic: BIC? = null): IbanBic = IbanBic(iban, bic)
     }
 }
 
@@ -476,8 +474,6 @@ public value class Currency private constructor(public val code: String) {
 
 @JvmInline
 public value class CRC32 private constructor(public val value: String) {
-    internal fun encodedValue(): String = value.uppercase()
-
     public companion object {
         private const val LENGTH: Int = 8
         private val hexDigits = ('0'..'9') + ('A'..'F') + ('a'..'f')
