@@ -70,7 +70,7 @@ class AmountTest {
         )
 
         for ((input, expectedErrorMessage) in invalidTestCases) {
-            val exception = assertFailsWith<IllegalArgumentException>(
+            val exception = assertFailsWith<SpaydException>(
                 message = "Expected exception for invalid input: '$input'"
             ) {
                 Amount.fromString(input)

@@ -19,7 +19,7 @@ class BankCodeTest {
         val inputs = listOf("123", "12345", "12a4", "")
 
         inputs.forEach { input ->
-            val exception = assertFailsWith<IllegalArgumentException>("Failed for input - $input") {
+            val exception = assertFailsWith<SpaydException>("Failed for input - $input") {
                 BankCode.fromString(input)
             }
             assertEquals(

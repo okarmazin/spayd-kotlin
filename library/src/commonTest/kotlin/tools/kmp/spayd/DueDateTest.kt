@@ -63,7 +63,7 @@ class DueDateTest {
     }
 
     private fun assertInvalidDate(dateString: String, expectedMessage: String) {
-        val exception = assertFailsWith<IllegalArgumentException>("failed for input: $dateString") {
+        val exception = assertFailsWith<SpaydException>("failed for input: $dateString") {
             DueDate.fromString(dateString)
         }
 

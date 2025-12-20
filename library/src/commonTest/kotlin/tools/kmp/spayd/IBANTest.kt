@@ -26,28 +26,28 @@ class IBANTest {
     @Test
     fun `fromString with IBAN shorter than allowed length throws exception`() {
         val shortIBAN = "DE89"
-        val exception = assertFailsWith<IllegalArgumentException> { IBAN.fromString(shortIBAN) }
+        val exception = assertFailsWith<SpaydException> { IBAN.fromString(shortIBAN) }
         assertEquals("IBAN length (4) is not in the allowed range 16..34.", exception.message)
     }
 
     @Test
     fun `fromString with IBAN longer than allowed length throws exception`() {
         val longIBAN = "DE8937040044053201300012345678901234"
-        val exception = assertFailsWith<IllegalArgumentException> { IBAN.fromString(longIBAN) }
+        val exception = assertFailsWith<SpaydException> { IBAN.fromString(longIBAN) }
         assertEquals("IBAN length (36) is not in the allowed range 16..34.", exception.message)
     }
 
     @Test
     fun `fromString with invalid country code throws exception`() {
         val invalidCountryCode = "1290370400440532013000"
-        val exception = assertFailsWith<IllegalArgumentException> { IBAN.fromString(invalidCountryCode) }
+        val exception = assertFailsWith<SpaydException> { IBAN.fromString(invalidCountryCode) }
         assertEquals("Invalid country code.", exception.message)
     }
 
     @Test
     fun `fromString with invalid check digits throws exception`() {
         val invalidCheckDigits = "DE8X370400440532013000"
-        val exception = assertFailsWith<IllegalArgumentException> { IBAN.fromString(invalidCheckDigits) }
+        val exception = assertFailsWith<SpaydException> { IBAN.fromString(invalidCheckDigits) }
         assertEquals("Invalid check digits.", exception.message)
     }
 
@@ -55,7 +55,7 @@ class IBANTest {
     fun `fromString with IBAN failing mod97 check throws exception`() {
         val invalidMod97IBAN = "DE89370400440532013001"
 
-        val exception = assertFailsWith<IllegalArgumentException> { IBAN.fromString(invalidMod97IBAN) }
+        val exception = assertFailsWith<SpaydException> { IBAN.fromString(invalidMod97IBAN) }
         assertEquals("Invalid IBAN: did not pass mod97 check.", exception.message)
     }
 }

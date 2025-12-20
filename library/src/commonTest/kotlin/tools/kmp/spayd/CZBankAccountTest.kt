@@ -36,7 +36,7 @@ class CZBankAccountTest {
     fun `invalid format - missing bank code`() {
         val inputs = setOf(VALID_NUM, "/", "$VALID_NUM/$VALID_CODE/$VALID_CODE", "")
         for (input in inputs) {
-            assertFailsWith<IllegalArgumentException>("Failed for input: $input") {
+            assertFailsWith<SpaydException>("Failed for input: $input") {
                 CZBankAccount.fromString(VALID_NUM)
             }
         }

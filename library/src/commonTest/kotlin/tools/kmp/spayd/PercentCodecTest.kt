@@ -17,12 +17,12 @@ class PercentCodecTest {
         }
         run {
             val encoded = "123%C3%A1%C3%A9 %E2%80%B0%1"
-            val ex = assertFailsWith<IllegalArgumentException> { spaydPercentDecode(encoded) }
+            val ex = assertFailsWith<SpaydException> { spaydPercentDecode(encoded) }
             assertEquals("Invalid percent-encoded byte: Missing hexadecimal digit after '%'", ex.message)
         }
         run {
             val encoded = "123%C3%A1%C3%A9 %E2%80%B0%"
-            val ex = assertFailsWith<IllegalArgumentException> { spaydPercentDecode(encoded) }
+            val ex = assertFailsWith<SpaydException> { spaydPercentDecode(encoded) }
             assertEquals("Invalid percent-encoded byte: Missing hexadecimal digit after '%'", ex.message)
         }
     }

@@ -87,8 +87,8 @@ class SpaydTest {
         )
 
         for ((index, invalidString) in invalidStrings.withIndex()) {
-            val exception = assertFailsWith<IllegalArgumentException>(
-                message = "Expected IllegalArgumentException for string: '$invalidString'",
+            val exception = assertFailsWith<SpaydException>(
+                message = "Expected SpaydException for string: '$invalidString'",
                 block = { Spayd.decodeFromString(invalidString) }
             )
             assertEquals(
@@ -103,14 +103,14 @@ class SpaydTest {
         run {
             val cases = listOf("SPD*1.0*ACC", "SPD*1.0*ACC*")
             for (case in cases) {
-                val exception = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(case) }
+                val exception = assertFailsWith<SpaydException> { Spayd.decodeFromString(case) }
                 assertEquals("Invalid key-value pair at index 0: missing ':' delimiter.", exception.message)
             }
         }
         run {
             val cases = listOf("SPD*1.0*X-A:123*MSG", "SPD*1.0*X-A:123*MSG*")
             for (case in cases) {
-                val exception = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(case) }
+                val exception = assertFailsWith<SpaydException> { Spayd.decodeFromString(case) }
                 assertEquals("Invalid key-value pair at index 1: missing ':' delimiter.", exception.message)
             }
         }
@@ -119,7 +119,7 @@ class SpaydTest {
     @Test
     fun `test illegal characters in key-value pair KEYS`() {
         fun performTest(input: String, idx: Int, c: Char, cidx: Int) {
-            val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(input) }
+            val ex = assertFailsWith<SpaydException> { Spayd.decodeFromString(input) }
             val expected =
                 "Key-value at index $idx contains illegal character '$c' at index ${cidx}. Allowed key characters: [A-Z-]"
             assertEquals(expected, ex.message)
@@ -135,7 +135,7 @@ class SpaydTest {
     @Test
     fun `test illegal prefix in key-value pair KEYS`() {
         fun performTest(input: String) {
-            val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(input) }
+            val ex = assertFailsWith<SpaydException> { Spayd.decodeFromString(input) }
             val expected = "Custom keys must start with 'X-'."
             assertEquals(expected, ex.message)
         }
@@ -187,7 +187,7 @@ class SpaydTest {
         val string =
             "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:123*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a*X-CUSTOM:456*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123"
 
-        val ex = assertFailsWith<IllegalArgumentException> { Spayd.decodeFromString(string) }
+        val ex = assertFailsWith<SpaydException> { Spayd.decodeFromString(string) }
         assertEquals("Duplicate keys found: [ALT-ACC: at indexes 1, 10; X-CUSTOM: at indexes 5, 9]", ex.message)
     }
 

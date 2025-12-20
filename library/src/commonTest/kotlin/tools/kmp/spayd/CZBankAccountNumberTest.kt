@@ -16,7 +16,7 @@ class CZBankAccountNumberTest {
         val invalids = setOf("", "-", "1", "12345678901", "$VALID_PREFIX-$VALID_NUM-$VALID_NUM")
         invalids.forEach {
             val ex =
-                assertFailsWith<IllegalArgumentException>("Failed for input: $it") { CZBankAccountNumber.fromString(it) }
+                assertFailsWith<SpaydException>("Failed for input: $it") { CZBankAccountNumber.fromString(it) }
             assertEquals("Invalid CZ bank account number format.", ex.message)
         }
     }
@@ -26,12 +26,12 @@ class CZBankAccountNumberTest {
         val invalids = setOf("723", "$VALID_PREFIX-2436782", "1463-$VALID_NUM")
         invalids.forEach {
             val ex =
-                assertFailsWith<IllegalArgumentException>("Failed for input: $it") { CZBankAccountNumber.fromString(it) }
+                assertFailsWith<SpaydException>("Failed for input: $it") { CZBankAccountNumber.fromString(it) }
             assertEquals("Invalid CZ bank account number - check digit is invalid.", ex.message)
         }
 
         val allZero = "000000"
-        val ex = assertFailsWith<IllegalArgumentException>("Failed for input: $allZero") {
+        val ex = assertFailsWith<SpaydException>("Failed for input: $allZero") {
             CZBankAccountNumber.fromString(allZero)
         }
         assertEquals("Invalid CZ bank account number - must have at least 2 non-zero digits.", ex.message)

@@ -142,8 +142,9 @@ public class Spayd private constructor(
         public fun customAttribute(customAttribute: CustomAttribute): Builder =
             apply { customAttrs.add(customAttribute) }
 
+        @Throws(SpaydException::class)
         public fun build(): Spayd {
-            val acc = acc ?: throw IllegalArgumentException("ACC: Account attribute is required.")
+            val acc = acc ?: throw SpaydException("ACC: Account attribute is required.")
 
             return Spayd(
                 acc,
@@ -161,7 +162,7 @@ public class Spayd private constructor(
         public val logger: Logger?,
     ) {
 
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun encode(spayd: Spayd): String = buildString {
             append("SPD*1.0*")
             append("ACC:${spayd.account.encode()}*")
@@ -243,7 +244,7 @@ public class Spayd private constructor(
         public val logger: Logger? = null,
     ) {
 
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun decode(spayd: String): Spayd = decodeSpayd(spayd, logger)
 
         public class Builder {
@@ -277,9 +278,22 @@ public interface Logger {
     }
 }
 
+/**
+ * Base exception thrown from the library. If a thrown exception is not an instance of [SpaydException],
+ * it is likely a bug and should be reported.
+ */
+public class SpaydException(message: String?, cause: Throwable? = null) : IllegalArgumentException(message, cause)
+
+private inline fun req(value: Boolean, lazyMessage: () -> Any) = try {
+    require(value, lazyMessage)
+} catch (e: IllegalArgumentException) {
+    throw SpaydException(e.message, e)
+}
+
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
     internal companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         fun fromString(value: String): IbanBic {
             val parts = value.split('+', limit = 2)
             val iban = parts[0]
@@ -300,14 +314,14 @@ public data class IBAN private constructor(val value: String) {
         public const val MAX_LENGTH: Int = 34
 
         @JvmStatic
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun fromString(string: String): IBAN {
             val string = string.filterNot { it.isWhitespace() }
-            require(string.length in MIN_LENGTH..MAX_LENGTH) {
+            req(string.length in MIN_LENGTH..MAX_LENGTH) {
                 "IBAN length (${string.length}) is not in the allowed range $MIN_LENGTH..$MAX_LENGTH."
             }
-            require(string.take(2).all { it in 'A'..'Z' }) { "Invalid country code." }
-            require(string.drop(2).take(2).all { it in '0'..'9' }) { "Invalid check digits." }
+            req(string.take(2).all { it in 'A'..'Z' }) { "Invalid country code." }
+            req(string.drop(2).take(2).all { it in '0'..'9' }) { "Invalid check digits." }
 
             val rearrangedDigits = buildString {
                 for (c in string.drop(4) + string.take(4)) {
@@ -319,7 +333,7 @@ public data class IBAN private constructor(val value: String) {
                 }
             }
 
-            require(mod97(rearrangedDigits) == 1) { "Invalid IBAN: did not pass mod97 check." }
+            req(mod97(rearrangedDigits) == 1) { "Invalid IBAN: did not pass mod97 check." }
 
             return IBAN(string)
         }
@@ -354,17 +368,17 @@ public data class BIC private constructor(val value: String) {
     public companion object {
 
         @JvmStatic
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun fromString(string: String): BIC {
             // From Wikipedia:
             // 4 letters, 2 letters, 2 alphanum, 3 alphanum (optional)
-            require(string.length == 8 || string.length == 11) {
+            req(string.length == 8 || string.length == 11) {
                 "BIC must be 8 OR 11 characters long, was ${string.length}."
             }
             val letters = string.take(6)
             val alphanum = string.drop(6)
-            require(letters.all { it in 'A'..'Z' }) { "BIC must start with 6 uppercase letters." }
-            require(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) { "BIC must end with 2 or 5 alphanumeric characters." }
+            req(letters.all { it in 'A'..'Z' }) { "BIC must start with 6 uppercase letters." }
+            req(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) { "BIC must end with 2 or 5 alphanumeric characters." }
             return BIC(string)
         }
     }
@@ -380,11 +394,11 @@ public data class CZBankAccount private constructor(
     internal companion object {
 
         @JvmStatic
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         fun fromString(string: String): CZBankAccount {
             val string = string.trim()
             val splits = string.split('/')
-            require(splits.size == 2) {
+            req(splits.size == 2) {
                 "Invalid account number with bank code. Expected 2 parts separated by '/', but has ${splits.size} parts."
             }
             val number = CZBankAccountNumber.fromString(splits[0])
@@ -408,10 +422,10 @@ public data class CZBankAccountNumber private constructor(val prefix: String, va
         private val regex = Regex("^[0-9]{2,10}$|^[0-9]{2,6}-[0-9]{2,10}$")
 
         @JvmStatic
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun fromString(string: String): CZBankAccountNumber {
             val string = string.trim()
-            require(string.matches(regex)) { "Invalid CZ bank account number format." }
+            req(string.matches(regex)) { "Invalid CZ bank account number format." }
             val parts = string.split("-")
             return when (parts.size) {
                 1 -> {
@@ -427,20 +441,20 @@ public data class CZBankAccountNumber private constructor(val prefix: String, va
 
                 else -> {
                     // If this ever happens, the regex engine has a bug.
-                    throw IllegalStateException("CZ bank number regex matched, but split into more than 2 parts (${parts.size}).")
+                    throw SpaydException("CZ bank number regex matched, but split into more than 2 parts (${parts.size}).")
                 }
             }
         }
 
         private fun validatePart(part: String, maxLength: Int, minNotZeroDigits: Int) {
-            require(part.length <= maxLength) { "Invalid CZ bank account number part length (${part.length}). Must be <= $maxLength." }
+            req(part.length <= maxLength) { "Invalid CZ bank account number part length (${part.length}). Must be <= $maxLength." }
             var notZeroCount = 0
             val sum = part.padStart(maxLength, '0').reversed().foldIndexed(0) { index, acc, c ->
                 if (c != '0') notZeroCount++
                 acc + c.digitToInt() * weights[index]
             }
-            require(notZeroCount >= minNotZeroDigits) { "Invalid CZ bank account number - must have at least $minNotZeroDigits non-zero digits." }
-            require(sum % 11 == 0) { "Invalid CZ bank account number - check digit is invalid." }
+            req(notZeroCount >= minNotZeroDigits) { "Invalid CZ bank account number - must have at least $minNotZeroDigits non-zero digits." }
+            req(sum % 11 == 0) { "Invalid CZ bank account number - check digit is invalid." }
         }
     }
 }
@@ -454,9 +468,9 @@ public data class BankCode private constructor(val value: String) {
 
     public companion object {
         @JvmStatic
-        @Throws(IllegalArgumentException::class)
+        @Throws(SpaydException::class)
         public fun fromString(string: String): BankCode {
-            require(string.length == 4 && string.all { it in '0'..'9' }) {
+            req(string.length == 4 && string.all { it in '0'..'9' }) {
                 "Invalid bank code. Must be exactly 4 digits. Input has either bad length, or contains non-digits."
             }
             return BankCode(string)
@@ -475,19 +489,20 @@ public value class Amount private constructor(public val value: String) {
         // @formatter:on
 
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): Amount {
             val isNumber = value.isNotEmpty() && value.all { isAsciiDigit(it) || it == '.' }
-            require(isNumber) { ERR_NAN }
-            require(value != ".") { ERR_SINGLE_DECIMAL_POINT }
+            req(isNumber) { ERR_NAN }
+            req(value != ".") { ERR_SINGLE_DECIMAL_POINT }
             val parts = value.split('.')
-            require(parts.size <= 2) { ERR_NAN }
+            req(parts.size <= 2) { ERR_NAN }
             val integerPart = parts[0].dropWhile { it == '0' }.ifEmpty { "0" }
             val decimalPart = parts.getOrNull(1).orEmpty().dropLastWhile { it == '0' }
 
-            require(decimalPart.length <= 2) { ERR_TOO_MANY_DECIMALS }
+            req(decimalPart.length <= 2) { ERR_TOO_MANY_DECIMALS }
             val decimalSuffix = if (decimalPart.isEmpty()) "" else ".$decimalPart"
             val normalized = "$integerPart$decimalSuffix"
-            require(normalized.length in 1..10) { ERR_TOO_LONG }
+            req(normalized.length in 1..10) { ERR_TOO_LONG }
             return Amount(integerPart + decimalSuffix)
         }
     }
@@ -497,8 +512,9 @@ public value class Amount private constructor(public val value: String) {
 public value class Currency private constructor(public val code: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): Currency {
-            require(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
+            req(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
                 "CC: Currency code must be exactly 3 letters."
             }
             return Currency(value)
@@ -516,11 +532,14 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
 
     public companion object {
 
+        @JvmStatic
+        @Throws(SpaydException::class)
         public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): DueDate = create(year, monthNumber, dayOfMonth)
 
         @JvmStatic
+        @Throws(SpaydException::class)
         internal fun fromString(value: String): DueDate {
-            require(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
+            req(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
             val year = value.take(4).toInt()
             val month = value.drop(4).take(2).toInt()
             val day = value.takeLast(2).toInt()
@@ -528,9 +547,9 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
         }
 
         private fun create(year: Int, month: Int, day: Int): DueDate {
-            require(year >= 1900) { "Unreasonable year: $year." }
-            require(month in 1..12) { "Month number must be between 1 and 12." }
-            require(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
+            req(year >= 1900) { "Unreasonable year: $year." }
+            req(month in 1..12) { "Month number must be between 1 and 12." }
+            req(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
             return DueDate(
                 year = year,
                 monthNumber = month,
@@ -542,7 +561,7 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
             1, 3, 5, 7, 8, 10, 12 -> 31
             4, 6, 9, 11 -> 30
             2 -> if (isLeapYear(year)) 29 else 28
-            else -> throw IllegalArgumentException("Invalid month number: $monthNumber")
+            else -> throw SpaydException("Invalid month number: $monthNumber")
         }
 
         private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
@@ -555,8 +574,9 @@ public value class Message private constructor(public val value: String) {
         public const val MAX_LENGTH: Int = 60
 
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): Message {
-            require(value.length <= MAX_LENGTH) { "MSG: Message must not exceed $MAX_LENGTH characters." }
+            req(value.length <= MAX_LENGTH) { "MSG: Message must not exceed $MAX_LENGTH characters." }
             return Message(value)
         }
     }
@@ -570,10 +590,12 @@ public enum class NotificationType {
     EMAIL;
 
     public companion object {
+        @JvmStatic
+        @Throws(SpaydException::class)
         internal fun fromString(value: String): NotificationType = when (value) {
             "P" -> PHONE
             "E" -> EMAIL
-            else -> throw IllegalArgumentException("NT: Invalid notification type. Must be one of [P, E]")
+            else -> throw SpaydException("NT: Invalid notification type. Must be one of [P, E]")
         }
     }
 }
@@ -584,8 +606,9 @@ public value class NotificationAddress private constructor(public val value: Str
         public const val MAX_LENGTH: Int = 320
 
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): NotificationAddress {
-            require(value.length <= MAX_LENGTH) { "NTA: Notification address must be at most $MAX_LENGTH characters long." }
+            req(value.length <= MAX_LENGTH) { "NTA: Notification address must be at most $MAX_LENGTH characters long." }
             return NotificationAddress(value)
         }
     }
@@ -603,8 +626,9 @@ public sealed class PaymentType {
 
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): PaymentType {
-            require(value.length in 1..3) { "PT: Payment type must be 1 to 3 characters long." }
+            req(value.length in 1..3) { "PT: Payment type must be 1 to 3 characters long." }
             return when (value) {
                 "IP" -> InstantPayment
                 else -> Custom(value)
@@ -617,8 +641,9 @@ public sealed class PaymentType {
 public value class SenderReference private constructor(public val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): SenderReference {
-            require(value.length in 1..16 && isAsciiDigits(value)) {
+            req(value.length in 1..16 && isAsciiDigits(value)) {
                 "RF: Sender reference must be a string of digits from 1 to 16 characters long."
             }
             return SenderReference(value)
@@ -631,8 +656,10 @@ public value class Recipient private constructor(public val value: String) {
     public companion object {
         public const val MAX_LENGTH: Int = 35
 
+        @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): Recipient {
-            require(value.length <= MAX_LENGTH) { "RN: Recipient must be at most $MAX_LENGTH characters long." }
+            req(value.length <= MAX_LENGTH) { "RN: Recipient must be at most $MAX_LENGTH characters long." }
             return Recipient(value)
         }
     }
@@ -642,8 +669,9 @@ public value class Recipient private constructor(public val value: String) {
 public value class VS private constructor(public val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): VS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "X-VS: VS must be 1 to 10 digits." }
+            req(value.length in 1..10 && isAsciiDigits(value)) { "X-VS: VS must be 1 to 10 digits." }
             return VS(value)
         }
     }
@@ -653,8 +681,9 @@ public value class VS private constructor(public val value: String) {
 public value class SS private constructor(public val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): SS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "X-SS: SS must be 1 to 10 digits." }
+            req(value.length in 1..10 && isAsciiDigits(value)) { "X-SS: SS must be 1 to 10 digits." }
             return SS(value)
         }
     }
@@ -664,8 +693,9 @@ public value class SS private constructor(public val value: String) {
 public value class KS private constructor(public val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): KS {
-            require(value.length in 1..10 && isAsciiDigits(value)) { "X-KS: KS must be 1 to 10 digits." }
+            req(value.length in 1..10 && isAsciiDigits(value)) { "X-KS: KS must be 1 to 10 digits." }
             return KS(value)
         }
     }
@@ -675,8 +705,9 @@ public value class KS private constructor(public val value: String) {
 public value class CzRetryDays private constructor(public val value: Int) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): CzRetryDays {
-            require(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
+            req(value.length in 1..2 && isAsciiDigits(value) && value.toInt() in 1..30) {
                 "X-PER: Retry days must be a number from 1 to 30"
             }
             return CzRetryDays(value.toInt())
@@ -688,8 +719,9 @@ public value class CzRetryDays private constructor(public val value: Int) {
 public value class CzPaymentId private constructor(public val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): CzPaymentId {
-            require(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
+            req(value.length in 1..20) { "X-ID must be 1 to 20 characters long." }
             return CzPaymentId(value)
         }
     }
@@ -701,8 +733,9 @@ public value class URL private constructor(public val value: String) {
         public const val MAX_LENGTH: Int = 140
 
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun fromString(value: String): URL {
-            require(value.length <= MAX_LENGTH) { "X-URL: URL must be at most $MAX_LENGTH characters long." }
+            req(value.length <= MAX_LENGTH) { "X-URL: URL must be at most $MAX_LENGTH characters long." }
             return URL(value)
         }
     }
@@ -712,8 +745,9 @@ public value class URL private constructor(public val value: String) {
 public data class CustomAttribute private constructor(val key: String, val value: String) {
     public companion object {
         @JvmStatic
+        @Throws(SpaydException::class)
         public fun create(key: String, value: String): CustomAttribute {
-            require(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
+            req(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
             return CustomAttribute(key, value)
         }
     }
@@ -723,32 +757,32 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
     companion object {
         fun fromIndexedValue(value: IndexedValue<String>, logger: Logger?): ParsedSpaydEntry {
             val parts = value.value.split(':', limit = 2)
-            require(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
+            req(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
             checkKey(value.index, parts[0], logger)
             val decoded = try {
                 spaydPercentDecode(parts[1])
-            } catch (e: IllegalArgumentException) {
-                throw IllegalArgumentException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
+            } catch (e: SpaydException) {
+                throw SpaydException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
             }
             return ParsedSpaydEntry(index = value.index, key = parts[0], percentDecodedValue = decoded)
         }
     }
 }
 
-@Throws(IllegalArgumentException::class)
+@Throws(SpaydException::class)
 private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
     for ((index, char) in spayd.withIndex()) {
         if (char > '\u00FF') {
-            throw IllegalArgumentException("Illegal character at index $index. SPAYD requires ISO-8859-1 charset.")
+            throw SpaydException("Illegal character at index $index. SPAYD requires ISO-8859-1 charset.")
         }
     }
     val basicRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
-    require(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
+    req(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
     val spayd = preprocessForDecoding(spayd)
     val spaydEntries = spayd.split('*').drop(2).withIndex().map { ParsedSpaydEntry.fromIndexedValue(it, logger) }
     val duplicates = spaydEntries.groupBy { it.key }.filter { it.value.size > 1 }
-    require(duplicates.isEmpty()) {
+    req(duplicates.isEmpty()) {
         val report = duplicates.entries.joinToString(
             separator = "; ",
             prefix = "[",
@@ -770,8 +804,8 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "ALT-ACC" -> {
                 try {
                     receivedAltAccounts = value.split(',').map(IbanBic::fromString)
-                } catch (e: IllegalArgumentException) {
-                    throw IllegalArgumentException("Cannot parse ALT-ACC: ${e.message}", e)
+                } catch (e: SpaydException) {
+                    throw SpaydException("Cannot parse ALT-ACC: ${e.message}", e)
                 }
             }
 
@@ -803,7 +837,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
         }
 
         receivedNt != null || receivedNta != null -> {
-            throw IllegalArgumentException("NT/NTA: Both NT and NTA attributes must be specified, or neither. Having just one makes no real sense")
+            throw SpaydException("NT/NTA: Both NT and NTA attributes must be specified, or neither. Having just one makes no real sense")
         }
     }
     // TODO check CRC32
@@ -811,6 +845,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
 }
 
 private fun preprocessForDecoding(spayd: String, lenient: Boolean = false): String {
+    // TODO remove lenient param
     var spayd = spayd
     if (lenient) {
         spayd = spayd.trim()
@@ -839,12 +874,12 @@ private val predefinedKeys =
 private fun checkKey(index: Int, key: String, logger: Logger?) {
     val validChars = ('A'..'Z') + '-'
     for ((cindex, c) in key.withIndex()) {
-        require(c in validChars) {
+        req(c in validChars) {
             "Key-value at index $index contains illegal character '$c' at index ${cindex}. Allowed key characters: [A-Z-]"
         }
     }
 
-    require(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
+    req(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
     if (key.contains("--")) {
         logger?.warn("User-defined key '$key' contains '--'. This is allowed but suspicious.")
     }
@@ -905,10 +940,10 @@ internal fun spaydPercentDecode(content: String): String {
     val builder = StringBuilder()
     var pos = 0
     fun getHexaDigit(pos: Int): Int = content[pos].digitToIntOrNull(16)
-        ?: throw IllegalArgumentException("Invalid hexadecimal digit: '${content[pos]}'")
+        ?: throw SpaydException("Invalid hexadecimal digit: '${content[pos]}'")
 
     fun readEncodedByte(): Byte {
-        require(pos + 2 < content.length) { "Invalid percent-encoded byte: Missing hexadecimal digit after '%'" }
+        req(pos + 2 < content.length) { "Invalid percent-encoded byte: Missing hexadecimal digit after '%'" }
         val hi = getHexaDigit(pos + 1)
         val lo = getHexaDigit(pos + 2)
         val result = (hi shl 4) or lo
