@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-
+/**
+ * @author Ondřej Karmazín
+ */
 package tools.kmp.spayd
 
 import kotlin.jvm.JvmInline
