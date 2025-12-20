@@ -720,7 +720,7 @@ public data class CustomAttribute private constructor(val key: String, val value
 }
 
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
-    companion object Companion {
+    companion object {
         fun fromIndexedValue(value: IndexedValue<String>, logger: Logger?): ParsedSpaydEntry {
             val parts = value.value.split(':', limit = 2)
             require(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
