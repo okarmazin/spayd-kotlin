@@ -790,6 +790,9 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
     }
 }
 
+@Suppress("NOTHING_TO_INLINE")
+private inline fun String.isCustomKey() = startsWith("X-") && this !in CustomAttribute.reservedKeys
+
 @Throws(SpaydException::class)
 private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     // Conveniently, ISO-8859-1 is the first 256 Unicode code points - 0x00..0xFF!
@@ -802,7 +805,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     req(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
     val spayd = preprocessForDecoding(spayd)
     val spaydEntries = spayd.split('*').drop(2).withIndex().map { ParsedSpaydEntry.fromIndexedValue(it, logger) }
-    val duplicates = spaydEntries.groupBy { it.key }.filter { it.value.size > 1 }
+    val duplicates = spaydEntries.filterNot { it.key.isCustomKey() }.groupBy { it.key }.filter { it.value.size > 1 }
     req(duplicates.isEmpty()) {
         val report = duplicates.entries.joinToString(
             separator = "; ",
@@ -811,7 +814,6 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
         ) { (key, values) -> "$key: at indexes ${values.joinToString { it.index.toString() }}" }
         "Duplicate keys found: $report"
     }
-    // TODO allow duplicate custom keys
 
     var receivedNt: String? = null
     var receivedNta: String? = null

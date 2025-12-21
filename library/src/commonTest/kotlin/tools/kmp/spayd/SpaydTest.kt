@@ -173,7 +173,7 @@ class SpaydTest {
     @Test
     fun `test real spayd decode`() {
         val string =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*X-CUSTOM:123*X-CUSTOM:456*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11*X-CUSTOM:orang utan*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a"
         val result = Spayd.decodeFromString(string)
         assertEquals("CZ0608000000192235210247", result.account.iban.value)
         assertContentEquals(
@@ -185,15 +185,23 @@ class SpaydTest {
         assertEquals("1113334445", result.vs!!.value)
         assertEquals("11", result.ss!!.value)
         assertEquals("T-Mobile - QR platba123áé ‰*", result.message!!.value)
+        assertEquals(
+            listOf(
+                CustomAttribute.create("X-CUSTOM", "123"),
+                CustomAttribute.create("X-CUSTOM", "456"),
+                CustomAttribute.create("X-CUSTOM", "orang utan")
+            ),
+            result.customAttributes
+        )
     }
 
     @Test
     fun `test duplicate error message`() {
         val string =
-            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:123*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a*X-CUSTOM:456*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123"
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399*CC:CZK*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:123*X-VS:1113334445*X-SS:11*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2a*AM:399*X-CUSTOM:456*X-CUSTOM:123*ALT-ACC:CZ9106000000000000000123,CZ9106000000000000000123"
 
         val ex = assertFailsWith<SpaydException> { Spayd.decodeFromString(string) }
-        assertEquals("Duplicate keys found: [ALT-ACC: at indexes 1, 10; X-CUSTOM: at indexes 5, 9]", ex.message)
+        assertEquals("Duplicate keys found: [ALT-ACC: at indexes 1, 12; AM: at indexes 2, 9]", ex.message)
     }
 
     @Test
