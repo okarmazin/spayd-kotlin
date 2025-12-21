@@ -19,6 +19,8 @@ private constructor(
     public val currency: Currency?,
     /** DT: Datum splatnosti */
     public val dueDate: LocalDate?,
+    /** DL: Ukonceni platnosti trvaleho prikazu / ukonceni svoleni k inkasu */
+    public val validUntil: LocalDate?,
     /** MSG */
     public val message: Message?,
     /** NT */
@@ -68,6 +70,7 @@ private constructor(
         if (amount != other.amount) return false
         if (currency != other.currency) return false
         if (dueDate != other.dueDate) return false
+        if (validUntil != other.validUntil) return false
         if (message != other.message) return false
         if (notificationType != other.notificationType) return false
         if (notificationAddress != other.notificationAddress) return false
@@ -94,6 +97,7 @@ private constructor(
         result = 31 * result + amount.hashCode()
         result = 31 * result + currency.hashCode()
         result = 31 * result + dueDate.hashCode()
+        result = 31 * result + validUntil.hashCode()
         result = 31 * result + message.hashCode()
         result = 31 * result + notificationType.hashCode()
         result = 31 * result + notificationAddress.hashCode()
@@ -119,6 +123,7 @@ private constructor(
         private var amount: Amount? = null
         private var currency: Currency? = null
         private var dueDate: LocalDate? = null
+        private var validUntil: LocalDate? = null
         private var message: Message? = null
         private var notificationType: NotificationType? = null
         private var notificationAddress: NotificationAddress? = null
@@ -161,6 +166,8 @@ private constructor(
 
         public fun persistAfterDeath(shouldPersist: Boolean): Builder = apply { this.persistAfterDeath = shouldPersist }
 
+        public fun validUntil(validUntil: LocalDate): Builder = apply { this.validUntil = validUntil }
+
         public fun senderReference(senderReference: SenderReference): Builder = apply {
             this.senderReference = senderReference
         }
@@ -196,6 +203,7 @@ private constructor(
                 amount = amount,
                 currency = currency,
                 dueDate = dueDate,
+                validUntil = validUntil,
                 message = message,
                 notificationType = notificationType,
                 notificationAddress = notificationAddress,
@@ -238,6 +246,7 @@ private constructor(
             }
             if (spayd.amount != null) parts.add("AM" to spayd.amount.encode())
             if (spayd.currency != null) parts.add("CC" to spayd.currency.encode())
+            if (spayd.validUntil != null) parts.add("DL" to spayd.validUntil.encode())
             if (spayd.dueDate != null) parts.add("DT" to spayd.dueDate.encode())
             if (spayd.message != null) parts.add("MSG" to spayd.message.encode(optimizeForQr))
             if (spayd.notificationType != null) parts.add("NT" to spayd.notificationType.encode())
@@ -658,31 +667,31 @@ public data class LocalDate private constructor(val year: Int, val monthNumber: 
 
         @JvmStatic
         @Throws(SpaydException::class)
-        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): LocalDate = create(year, monthNumber, dayOfMonth)
+        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): LocalDate = create("LocalDate", year, monthNumber, dayOfMonth)
 
         @JvmStatic
         @Throws(SpaydException::class)
-        internal fun fromString(value: String): LocalDate {
-            req(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
+        internal fun fromString(attrName: String, value: String): LocalDate {
+            req(value.length == 8 && value.all { it in '0'..'9' }) { "$attrName: Date must be exactly 8 digits (YYYYMMDD)." }
             val year = value.take(4).toInt()
             val month = value.drop(4).take(2).toInt()
             val day = value.takeLast(2).toInt()
-            return create(year, month, day)
+            return create(attrName, year, month, day)
         }
 
-        private fun create(year: Int, month: Int, day: Int): LocalDate {
-            req(year >= 1900) { "Unreasonable year: $year." }
-            req(month in 1..12) { "Month number must be between 1 and 12." }
-            req(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
+        private fun create(attrName: String, year: Int, month: Int, day: Int): LocalDate {
+            req(year >= 1900) { "$attrName: Unreasonable year: $year." }
+            req(month in 1..12) { "$attrName: Month number must be between 1 and 12." }
+            req(day in 1..daysInMonth(attrName, year, month)) { "$attrName: Invalid day of month: $day" }
             return LocalDate(year = year, monthNumber = month, dayOfMonth = day)
         }
 
-        private fun daysInMonth(year: Int, monthNumber: Int): Int =
+        private fun daysInMonth(attrName: String, year: Int, monthNumber: Int): Int =
             when (monthNumber) {
                 in setOf(1, 3, 5, 7, 8, 10, 12) -> 31
                 in setOf(4, 6, 9, 11) -> 30
                 2 -> if (isLeapYear(year)) 29 else 28
-                else -> throw SpaydException("Invalid month number: $monthNumber")
+                else -> throw SpaydException("$attrName: Invalid month number: $monthNumber")
             }
 
         private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
@@ -897,7 +906,7 @@ public data class CustomAttribute private constructor(val key: String, val value
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object {
         private val predefinedKeys =
-            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DH", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
+            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DH", "DL", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
 
         private fun requireValidKey(key: String, index: Int, logger: Logger?): String {
             if (key in predefinedKeys) return key
@@ -1002,7 +1011,8 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "CC" -> result.currency(Currency.fromString(value))
             "CRC32" -> receivedCrc32 = value
             "DH" -> result.persistAfterDeath(value.persistAfterDeath())
-            "DT" -> result.dueDate(LocalDate.fromString(value))
+            "DL" -> result.validUntil(LocalDate.fromString("DL", value))
+            "DT" -> result.dueDate(LocalDate.fromString("DT", value))
             "MSG" -> result.message(Message.fromString(value))
             "NT" -> receivedNt = value
             "NTA" -> receivedNta = value

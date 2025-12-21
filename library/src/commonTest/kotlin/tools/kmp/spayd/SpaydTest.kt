@@ -405,4 +405,30 @@ class SpaydTest {
             assertNull(spayd.selfMessage)
         }
     }
+
+    @Test
+    fun `test validUntil encoding`() {
+        val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).validUntil(LocalDate.of(2035, 12, 1)).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*DL:20351201*", encoder.encode(spayd))
+        }
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*", encoder.encode(spayd))
+        }
+    }
+
+    @Test
+    fun `test validUntil decoding`() {
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*DL:20351201*")
+            assertEquals(LocalDate.of(2035, 12, 1), spayd.validUntil)
+        }
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*")
+            assertNull(spayd.validUntil)
+        }
+    }
 }
