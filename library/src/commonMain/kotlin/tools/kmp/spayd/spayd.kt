@@ -67,6 +67,7 @@ private constructor(
         if (this === other) return true
         if (other !is Spayd) return false
 
+        if (descriptorType != other.descriptorType) return false
         if (account != other.account) return false
         if (altAccounts != other.altAccounts) return false
         if (amount != other.amount) return false
@@ -368,7 +369,7 @@ private constructor(
 
             public fun logger(logger: Logger?): Builder = apply { this.logger = logger }
 
-            public fun build(): Decoder = Decoder()
+            public fun build(): Decoder = Decoder(logger)
         }
     }
 }
@@ -454,7 +455,7 @@ public data class IBAN private constructor(val value: String) {
                 "IBAN length (${string.length}) is not in the allowed range $MIN_LENGTH..$MAX_LENGTH."
             }
             req(string.take(2).all { it in 'A'..'Z' }) { "Invalid country code." }
-            req(string.drop(2).take(2).all { it in '0'..'9' }) { "Invalid check digits." }
+            req(string.drop(2).take(2).all(::isAsciiDigit)) { "Invalid check digits." }
 
             val rearrangedDigits = buildString {
                 for (c in string.drop(4) + string.take(4)) {
@@ -647,7 +648,7 @@ public value class Amount private constructor(public val value: String) {
             val decimalSuffix = if (decimalPart.isEmpty()) "" else ".$decimalPart"
             val normalized = "$integerPart$decimalSuffix"
             req(normalized.length in 1..10) { ERR_TOO_LONG }
-            return Amount(integerPart + decimalSuffix)
+            return Amount(normalized)
         }
     }
 }
@@ -661,7 +662,7 @@ public value class Currency private constructor(public val code: String) {
             req(value.length == 3 && value.uppercase().all { it in 'A'..'Z' }) {
                 "CC: Currency code must be exactly 3 letters."
             }
-            return Currency(value)
+            return Currency(value.uppercase())
         }
     }
 }
@@ -682,7 +683,7 @@ public data class LocalDate private constructor(val year: Int, val monthNumber: 
         @JvmStatic
         @Throws(SpaydException::class)
         internal fun fromString(attrName: String, value: String): LocalDate {
-            req(value.length == 8 && value.all { it in '0'..'9' }) {
+            req(value.length == 8 && value.all(::isAsciiDigit)) {
                 "$attrName: Date must be exactly 8 digits (YYYYMMDD)."
             }
             val year = value.take(4).toInt()
@@ -692,7 +693,7 @@ public data class LocalDate private constructor(val year: Int, val monthNumber: 
         }
 
         private fun create(attrName: String, year: Int, month: Int, day: Int): LocalDate {
-            req(year >= 1900) { "$attrName: Unreasonable year: $year." }
+            req(year in 1900..9999) { "$attrName: Unreasonable year: $year." }
             req(month in 1..12) { "$attrName: Month number must be between 1 and 12." }
             req(day in 1..daysInMonth(attrName, year, month)) { "$attrName: Invalid day of month: $day" }
             return LocalDate(year = year, monthNumber = month, dayOfMonth = day)
