@@ -270,8 +270,8 @@ class SpaydTest {
     fun `golden path`() {
         val constructedSpayd: Spayd =
             Spayd.Builder()
-                .account(IbanBic.fromString("CZ0608000000192235210247"))
-                .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+                .account(IbanBic.fromCzAccount("721-77628031", "0710"))
+                .altAccount(IbanBic.fromCzAccount(CZBankAccount.fromString("721-77628031/0710")))
                 .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
                 .amount(Amount.fromString("599.00"))
                 .currency(Currency.fromString("CZK"))
@@ -284,13 +284,14 @@ class SpaydTest {
 
         // String received from an external source
         val receivedSpayd =
-            "SPD*1.0*ACC:CZ0608000000192235210247*AM:599*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-VS:1113334445*X-SS:11*"
+            "SPD*1.0*ACC:CZ5207100007210077628031*ALT-ACC:CZ5207100007210077628031,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*X-CUSTOM:orang utan*RN:T-Mobile Czech Republic a.s.*X-VS:1113334445*X-SS:11"
         val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
         val decodedSpayd = decoder.decode(receivedSpayd)
         assertEquals(constructedSpayd, decodedSpayd)
 
         val encoder = Spayd.Encoder.Builder().includeCrc32(true).logger(Logger.PRINTLN).build()
-        val expectedEncoded = "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:B4F793B6*"
+        val expectedEncoded =
+            "SPD*1.0*ACC:CZ5207100007210077628031*ALT-ACC:CZ5207100007210077628031,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:D7A7B86C*"
         val actualEncoded = encoder.encode(constructedSpayd)
         assertEquals(expectedEncoded, actualEncoded)
 
