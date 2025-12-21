@@ -46,6 +46,8 @@ private constructor(
     public val paymentId: CzPaymentId?,
     /** X-URL */
     public val url: URL?,
+    /** X-SELF: Private message for sender's own purposes */
+    public val selfMessage: SelfMessage?,
     public val customAttributes: List<CustomAttribute>?,
 ) {
     public enum class DescriptorType {
@@ -79,6 +81,7 @@ private constructor(
         if (retryDays != other.retryDays) return false
         if (paymentId != other.paymentId) return false
         if (url != other.url) return false
+        if (selfMessage != other.selfMessage) return false
         if (customAttributes != other.customAttributes) return false
 
         return true
@@ -104,6 +107,7 @@ private constructor(
         result = 31 * result + retryDays.hashCode()
         result = 31 * result + paymentId.hashCode()
         result = 31 * result + url.hashCode()
+        result = 31 * result + selfMessage.hashCode()
         result = 31 * result + customAttributes.hashCode()
         return result
     }
@@ -128,6 +132,7 @@ private constructor(
         private var retryDays: CzRetryDays? = null
         private var paymentId: CzPaymentId? = null
         private var url: URL? = null
+        private var selfMessage: SelfMessage? = null
         private val customAttrs = mutableListOf<CustomAttribute>()
 
         public fun descriptorType(descriptorType: DescriptorType): Builder = apply {
@@ -174,6 +179,8 @@ private constructor(
 
         public fun url(url: URL): Builder = apply { this.url = url }
 
+        public fun selfMessage(message: SelfMessage): Builder = apply { selfMessage = message }
+
         public fun customAttribute(customAttribute: CustomAttribute): Builder = apply {
             customAttrs.add(customAttribute)
         }
@@ -202,6 +209,7 @@ private constructor(
                 retryDays = retryDays,
                 paymentId = paymentId,
                 url = url,
+                selfMessage = selfMessage,
                 customAttributes = customAttrs.takeIf { it.isNotEmpty() },
             )
         }
@@ -246,6 +254,7 @@ private constructor(
             if (spayd.retryDays != null) parts.add("X-PER" to spayd.retryDays.encode())
             if (spayd.paymentId != null) parts.add("X-ID" to spayd.paymentId.encode(optimizeForQr))
             if (spayd.url != null) parts.add("X-URL" to spayd.url.encode(optimizeForQr))
+            if (spayd.selfMessage != null) parts.add("X-SELF" to spayd.selfMessage.encode(optimizeForQr))
 
             for (attr in spayd.customAttributes.orEmpty()) {
                 parts.add(attr.key to attr.encode(optimizeForQr))
@@ -285,6 +294,8 @@ private constructor(
         private inline fun CzPaymentId.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
         private inline fun URL.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
+        private inline fun SelfMessage.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
 
         private inline fun IbanBic.encode(): String {
             val content = iban.value + (bic?.value?.let { "+$it" } ?: "")
@@ -692,6 +703,20 @@ public value class Message private constructor(public val value: String) {
     }
 }
 
+@JvmInline
+public value class SelfMessage private constructor(public val value: String) {
+    public companion object {
+        public const val MAX_LENGTH: Int = 60
+
+        @JvmStatic
+        @Throws(SpaydException::class)
+        public fun fromString(value: String): SelfMessage {
+            req(value.length <= MAX_LENGTH) { "X-SELF: SelfMessage must not exceed $MAX_LENGTH characters." }
+            return SelfMessage(value)
+        }
+    }
+}
+
 public enum class NotificationType {
     /** NT:P */
     PHONE,
@@ -855,7 +880,7 @@ public value class URL private constructor(public val value: String) {
 @ConsistentCopyVisibility
 public data class CustomAttribute private constructor(val key: String, val value: String) {
     public companion object {
-        public val reservedKeys: Set<String> = setOf("X-VS", "X-SS", "X-KS", "X-PER", "X-ID", "X-URL")
+        public val reservedKeys: Set<String> = setOf("X-VS", "X-SS", "X-KS", "X-PER", "X-ID", "X-URL", "X-SELF")
 
         @JvmStatic
         @Throws(SpaydException::class)
@@ -991,6 +1016,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "X-PER" -> result.retryDays(CzRetryDays.fromString(value))
             "X-ID" -> result.paymentId(CzPaymentId.fromString(value))
             "X-URL" -> result.url(URL.fromString(value))
+            "X-SELF" -> result.selfMessage(SelfMessage.fromString(value))
             // Unknown custom attributes
             else -> result.customAttribute(CustomAttribute.create(entry.key, value))
         }

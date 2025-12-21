@@ -96,7 +96,7 @@ class SpaydTest {
                     block = { Spayd.decodeFromString(invalidString) },
                 )
             assertEquals(
-                "Missing required prefix. SPAYD must begin with one of ['SPD*{VERSION}*', 'SCD*{VERSION}*']",
+                "Invalid SPAYD. Must begin with one of ['SPD*{VERSION}*', 'SCD*{VERSION}*']",
                 exception.message,
             )
         }
@@ -380,5 +380,29 @@ class SpaydTest {
         }
     }
 
+    @Test
+    fun `test selfMessage encoding`() {
+        val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).selfMessage(SelfMessage.fromString("abcd")).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*X-SELF:abcd*", encoder.encode(spayd))
+        }
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*", encoder.encode(spayd))
+        }
+    }
 
+    @Test
+    fun `test selfMessage decoding`() {
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*X-SELF:abcd*")
+            assertEquals("abcd", spayd.selfMessage!!.value)
+        }
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*")
+            assertNull(spayd.selfMessage)
+        }
+    }
 }
