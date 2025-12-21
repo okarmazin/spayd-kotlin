@@ -8,7 +8,7 @@ Czech pay-by-qr standard for bank transfers, a.k.a. [QR Platba](https://qr-platb
 The library is published to Maven Central.
 
 ```
-implementation("tools.kmp:spayd:0.0.3") // check the latest version in Releases --->
+implementation("tools.kmp:spayd:0.0.4") // check the latest version in Releases --->
 ```
 
 _Alternatively, you can simply copy the file [`spayd.kt`](library/src/commonMain/kotlin/tools/kmp/spayd/spayd.kt) into
