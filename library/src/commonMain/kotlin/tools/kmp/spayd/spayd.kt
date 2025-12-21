@@ -827,6 +827,7 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
             setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
 
         private fun requireValidKey(key: String, index: Int, logger: Logger?): String {
+            if (key in predefinedKeys) return key
             val validChars = ('A'..'Z') + '-'
             for ((cindex, c) in key.withIndex()) {
                 req(c in validChars) {
@@ -834,7 +835,7 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
                 }
             }
 
-            req(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
+            req(key.startsWith("X-")) { "Custom keys must start with 'X-'." }
             if (key.contains("--")) {
                 logger?.warn("User-defined key '$key' contains '--'. This is allowed but suspicious.")
             }

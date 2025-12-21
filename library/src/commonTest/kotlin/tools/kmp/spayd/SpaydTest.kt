@@ -26,17 +26,17 @@ class SpaydTest {
         assertContentEquals(
             listOf("SPD", "1.0:0:"),
             "SPD:1.0:0:".split(':', limit = 2),
-            """Unexpected split result: "SPD:1.0:0:".split(':', limit = 2) != listOf("SPD", "1.0:0:")"""
+            """Unexpected split result: "SPD:1.0:0:".split(':', limit = 2) != listOf("SPD", "1.0:0:")""",
         )
         assertContentEquals(
             listOf("", "SPD", "1.0", "", ""),
             "*SPD*1.0**".split('*'),
-            """Unexpected split result: "SPD*1.0**".split('*') != listOf("SPD", "1.0", "", "")"""
+            """Unexpected split result: "SPD*1.0**".split('*') != listOf("SPD", "1.0", "", "")""",
         )
         assertContentEquals(
             listOf("SPD", "1.0", ""),
             "SPD*1.0*".split(Regex("\\*")),
-            """Unexpected split result: "SPD*1.0*".split(Regex("\\*")) != listOf("SPD", "1.0", "")"""
+            """Unexpected split result: "SPD*1.0*".split(Regex("\\*")) != listOf("SPD", "1.0", "")""",
         )
     }
 
@@ -55,46 +55,45 @@ class SpaydTest {
 
     @Test
     fun `bad prefix throws`() {
-        val invalidStrings = listOf(
-            // Missing SPD prefix
-            "",
-            "123*1.0*Content",
-            "spd*1.0*Content", // Lowercase prefix
-            " SPD*1.0*Content", // Leading space
-            "SPD *1.0*Content", // Space after prefix
+        val invalidStrings =
+            listOf(
+                // Missing SPD prefix
+                "",
+                "123*1.0*Content",
+                "spd*1.0*Content", // Lowercase prefix
+                " SPD*1.0*Content", // Leading space
+                "SPD *1.0*Content", // Space after prefix
 
-            // Invalid version format
-            "SPD**Content", // Missing version
-            "SPD*1,0*Content", // Comma instead of decimal point
-            "SPD*1*Content", // No decimal point
-            "SPD*.1*Content", // Missing integer part
-            "SPD*1.*Content", // Missing decimal part
-            "SPD*X.0*Content", // Non-numeric integer part
-            "SPD*1.Y*Content", // Non-numeric decimal part
+                // Invalid version format
+                "SPD**Content", // Missing version
+                "SPD*1,0*Content", // Comma instead of decimal point
+                "SPD*1*Content", // No decimal point
+                "SPD*.1*Content", // Missing integer part
+                "SPD*1.*Content", // Missing decimal part
+                "SPD*X.0*Content", // Non-numeric integer part
+                "SPD*1.Y*Content", // Non-numeric decimal part
 
-            // Invalid star pattern
-            "SPD*1.0", // Missing star after version
-            "SPD1.0*Content", // Missing star between SPD and version
+                // Invalid star pattern
+                "SPD*1.0", // Missing star after version
+                "SPD1.0*Content", // Missing star between SPD and version
 
-            // Empty content (regex requires content after last star)
-            "SPD*1.0*",
+                // Empty content (regex requires content after last star)
+                "SPD*1.0*",
 
-            // Other invalid patterns
-            "ASPDX*1.0*Content", // SPD not at beginning
-            "SPD:1.0*Content", // Wrong separator between SPD and version
-            "SPD*1:0*Content", // Wrong separator in version
-            "SPD*1.0:Content"  // Wrong separator after version
-        )
+                // Other invalid patterns
+                "ASPDX*1.0*Content", // SPD not at beginning
+                "SPD:1.0*Content", // Wrong separator between SPD and version
+                "SPD*1:0*Content", // Wrong separator in version
+                "SPD*1.0:Content", // Wrong separator after version
+            )
 
         for ((index, invalidString) in invalidStrings.withIndex()) {
-            val exception = assertFailsWith<SpaydException>(
-                message = "Expected SpaydException for string: '$invalidString'",
-                block = { Spayd.decodeFromString(invalidString) }
-            )
-            assertEquals(
-                "Missing required prefix 'SPD*{VERSION}*'",
-                exception.message
-            )
+            val exception =
+                assertFailsWith<SpaydException>(
+                    message = "Expected SpaydException for string: '$invalidString'",
+                    block = { Spayd.decodeFromString(invalidString) },
+                )
+            assertEquals("Missing required prefix 'SPD*{VERSION}*'", exception.message)
         }
     }
 
@@ -178,7 +177,8 @@ class SpaydTest {
         assertEquals("CZ0608000000192235210247", result.account.iban.value)
         assertContentEquals(
             listOf("CZ9003000000192235210247", "CZ4601000000192235210247"),
-            result.altAccounts?.map { it.iban.value })
+            result.altAccounts?.map { it.iban.value },
+        )
         assertEquals("399", result.amount!!.value)
         assertEquals("CZK", result.currency!!.code)
         assertEquals("T-Mobile Czech Republic a.s.", result.recipient?.value)
@@ -189,9 +189,9 @@ class SpaydTest {
             listOf(
                 CustomAttribute.create("X-CUSTOM", "123"),
                 CustomAttribute.create("X-CUSTOM", "456"),
-                CustomAttribute.create("X-CUSTOM", "orang utan")
+                CustomAttribute.create("X-CUSTOM", "orang utan"),
             ),
-            result.customAttributes
+            result.customAttributes,
         )
     }
 
@@ -206,20 +206,21 @@ class SpaydTest {
 
     @Test
     fun `test real spayd encode`() {
-        val spayd = Spayd.Builder()
-            .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
-            .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
-            .amount(Amount.fromString("399.01"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
-            .currency(Currency.fromString("CZK"))
-            .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
-            .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
-            .vs(VS.fromString("1113334445"))
-            .ss(SS.fromString("11"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
-            .account(IbanBic.fromString("CZ0608000000192235210247"))
-            .build()
+        val spayd =
+            Spayd.Builder()
+                .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+                .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
+                .amount(Amount.fromString("399.01"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
+                .currency(Currency.fromString("CZK"))
+                .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
+                .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+                .vs(VS.fromString("1113334445"))
+                .ss(SS.fromString("11"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
+                .account(IbanBic.fromString("CZ0608000000192235210247"))
+                .build()
 
         val expectedUnoptimized =
             "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:ayyy*X-CUSTOM:ayyyy*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*"
@@ -232,20 +233,21 @@ class SpaydTest {
 
     @Test
     fun `test CRC32`() {
-        val spayd = Spayd.Builder()
-            .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
-            .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
-            .amount(Amount.fromString("399.01"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
-            .currency(Currency.fromString("CZK"))
-            .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
-            .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
-            .vs(VS.fromString("1113334445"))
-            .ss(SS.fromString("11"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
-            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
-            .account(IbanBic.fromString("CZ0608000000192235210247"))
-            .build()
+        val spayd =
+            Spayd.Builder()
+                .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+                .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
+                .amount(Amount.fromString("399.01"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
+                .currency(Currency.fromString("CZK"))
+                .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
+                .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+                .vs(VS.fromString("1113334445"))
+                .ss(SS.fromString("11"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
+                .account(IbanBic.fromString("CZ0608000000192235210247"))
+                .build()
 
         val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).includeCrc32(true).build()
         val expected =
@@ -256,14 +258,43 @@ class SpaydTest {
     @Test
     fun `custom attribute rejects reserved prefix`() {
         for (reserved in CustomAttribute.reservedKeys) {
-            val ex = assertFailsWith<SpaydException> {
-                CustomAttribute.create(reserved, "value")
-            }
+            val ex = assertFailsWith<SpaydException> { CustomAttribute.create(reserved, "value") }
             assertEquals(
                 "Custom attribute key '$reserved' is reserved. Please use a different key for your own attribute.",
-                ex.message
+                ex.message,
             )
         }
     }
 
+    @Test
+    fun `golden path`() {
+        val constructedSpayd: Spayd =
+            Spayd.Builder()
+                .account(IbanBic.fromString("CZ0608000000192235210247"))
+                .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+                .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
+                .amount(Amount.fromString("599.00"))
+                .currency(Currency.fromString("CZK"))
+                .message(Message.fromString("T-Mobile - QR platba"))
+                .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+                .vs(VS.fromString("1113334445"))
+                .ss(SS.fromString("11"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
+                .build()
+
+        // String received from an external source
+        val receivedSpayd =
+            "SPD*1.0*ACC:CZ0608000000192235210247*AM:599*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-VS:1113334445*X-SS:11*"
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        val decodedSpayd = decoder.decode(receivedSpayd)
+        assertEquals(constructedSpayd, decodedSpayd)
+
+        val encoder = Spayd.Encoder.Builder().includeCrc32(true).logger(Logger.PRINTLN).build()
+        val expectedEncoded = "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:B4F793B6*"
+        val actualEncoded = encoder.encode(constructedSpayd)
+        assertEquals(expectedEncoded, actualEncoded)
+
+        assertEquals(decodedSpayd, decoder.decode(actualEncoded))
+        assertEquals(constructedSpayd, decoder.decode(actualEncoded))
+    }
 }
