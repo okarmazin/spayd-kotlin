@@ -223,6 +223,29 @@ class SpaydTest {
     }
 
     @Test
+    fun `test CRC32`() {
+        val spayd = Spayd.Builder()
+            .altAccount(IbanBic.fromString("CZ9003000000192235210247"))
+            .altAccount(IbanBic.fromString("CZ4601000000192235210247"))
+            .amount(Amount.fromString("399.01"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
+            .currency(Currency.fromString("CZK"))
+            .message(Message.fromString("T-Mobile - QR platba123áé ‰*"))
+            .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+            .vs(VS.fromString("1113334445"))
+            .ss(SS.fromString("11"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyy"))
+            .customAttribute(CustomAttribute.create("X-CUSTOM", "ayyyy"))
+            .account(IbanBic.fromString("CZ0608000000192235210247"))
+            .build()
+
+        val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).includeCrc32(true).build()
+        val expected =
+            "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:399.01*CC:CZK*MSG:T-Mobile - QR platba123%C3%A1%C3%A9 %E2%80%B0%2A*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:ayyy*X-CUSTOM:ayyyy*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:2B3CD92E*"
+        assertEquals(expected, encoder.encode(spayd))
+    }
+
+    @Test
     fun `custom attribute rejects reserved prefix`() {
         for (reserved in CustomAttribute.reservedKeys) {
             val ex = assertFailsWith<SpaydException> {

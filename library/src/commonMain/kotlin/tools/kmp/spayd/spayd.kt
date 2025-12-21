@@ -160,6 +160,7 @@ public class Spayd private constructor(
     public class Encoder private constructor(
         public val optimizeForQr: Boolean,
         public val logger: Logger?,
+        public val includeCrc32: Boolean,
     ) {
 
         @Throws(SpaydException::class)
@@ -194,6 +195,15 @@ public class Spayd private constructor(
             parts.sortWith(compareBy({ it.first }, { it.second }))
             logger?.debug("Sorted attributes: $parts")
             append(parts.joinToString("") { "${it.first}:${it.second}*" })
+
+            if (includeCrc32) {
+                val input = toString()
+                logger?.debug("CRC32 input: '$input'")
+                val checksum = Crc32Computer.computeHex(input)
+                logger?.debug("CRC32 checksum: '$checksum'")
+                append("CRC32:$checksum*")
+            }
+            logger?.debug("Encoded SPAYD: $this")
         }
 
         private inline fun Amount.encode(): String = value
@@ -236,11 +246,13 @@ public class Spayd private constructor(
         public class Builder {
             private var logger: Logger? = null
             private var optimizeForQr: Boolean = false
+            private var includeCrc32: Boolean = false
 
             public fun logger(logger: Logger?): Builder = apply { this.logger = logger }
             public fun optimizeForQr(optimizeForQr: Boolean): Builder = apply { this.optimizeForQr = optimizeForQr }
+            public fun includeCrc32(shouldInclude: Boolean): Builder = apply { this.includeCrc32 = shouldInclude }
 
-            public fun build(): Encoder = Encoder(optimizeForQr, logger)
+            public fun build(): Encoder = Encoder(optimizeForQr, logger, includeCrc32)
         }
     }
 
@@ -799,6 +811,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
         ) { (key, values) -> "$key: at indexes ${values.joinToString { it.index.toString() }}" }
         "Duplicate keys found: $report"
     }
+    // TODO allow duplicate custom keys
 
     var receivedNt: String? = null
     var receivedNta: String? = null
