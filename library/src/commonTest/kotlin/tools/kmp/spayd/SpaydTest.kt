@@ -93,7 +93,10 @@ class SpaydTest {
                     message = "Expected SpaydException for string: '$invalidString'",
                     block = { Spayd.decodeFromString(invalidString) },
                 )
-            assertEquals("Missing required prefix 'SPD*{VERSION}*'", exception.message)
+            assertEquals(
+                "Missing required prefix. SPAYD must begin with one of ['SPD*{VERSION}*', 'SCD*{VERSION}*']",
+                exception.message,
+            )
         }
     }
 
@@ -298,4 +301,38 @@ class SpaydTest {
         assertEquals(decodedSpayd, decoder.decode(actualEncoded))
         assertEquals(constructedSpayd, decoder.decode(actualEncoded))
     }
+
+    @Test
+    fun `golden path scd`() {
+        val constructedSpayd: Spayd =
+            Spayd.Builder()
+                .descriptorType(Spayd.DescriptorType.COLLECTION)
+                .account(IbanBic.fromCzAccount("721-77628031", "0710"))
+                .amount(Amount.fromString("599.00"))
+                .currency(Currency.fromString("CZK"))
+                .message(Message.fromString("T-Mobile - QR platba"))
+                .recipient(Recipient.fromString("T-Mobile Czech Republic a.s."))
+                .vs(VS.fromString("1113334445"))
+                .ss(SS.fromString("11"))
+                .customAttribute(CustomAttribute.create("X-CUSTOM", "orang utan"))
+                .build()
+
+        // String received from an external source
+        val receivedSpayd =
+            "SCD*1.0*ACC:CZ5207100007210077628031*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*"
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        val decodedSpayd = decoder.decode(receivedSpayd)
+        assertEquals(constructedSpayd, decodedSpayd)
+
+        val encoder = Spayd.Encoder.Builder().includeCrc32(true).logger(Logger.PRINTLN).build()
+        val expectedEncoded =
+            "SCD*1.0*ACC:CZ5207100007210077628031*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:6B767343*"
+        val actualEncoded = encoder.encode(constructedSpayd)
+        assertEquals(expectedEncoded, actualEncoded)
+
+        assertEquals(decodedSpayd, decoder.decode(actualEncoded))
+        assertEquals(constructedSpayd, decoder.decode(actualEncoded))
+    }
+
+
 }

@@ -7,6 +7,8 @@ import kotlin.jvm.JvmStatic
 
 public class Spayd
 private constructor(
+    /** Typ deskriptoru - PAYMENT (prikaz k uhrade) or COLLECTION (svoleni k inkasu) */
+    public val descriptorType: DescriptorType,
     /** ACC: Account, the only required attribute */
     public val account: IbanBic,
     /** ALT-ACC */
@@ -44,6 +46,13 @@ private constructor(
     public val url: URL?,
     public val customAttributes: List<CustomAttribute>?,
 ) {
+    public enum class DescriptorType {
+        /** Prikaz k uhrade */
+        PAYMENT,
+        /** Svoleni k inkasu */
+        COLLECTION,
+    }
+
     public companion object;
 
     override fun equals(other: Any?): Boolean {
@@ -73,7 +82,8 @@ private constructor(
     }
 
     override fun hashCode(): Int {
-        var result = account.hashCode()
+        var result = descriptorType.hashCode()
+        result = 31 * result + account.hashCode()
         result = 31 * result + altAccounts.hashCode()
         result = 31 * result + amount.hashCode()
         result = 31 * result + currency.hashCode()
@@ -95,6 +105,7 @@ private constructor(
     }
 
     public class Builder {
+        private var descriptorType: DescriptorType = DescriptorType.PAYMENT
         private var acc: IbanBic? = null
         private var altAccs = mutableSetOf<IbanBic>()
         private var amount: Amount? = null
@@ -113,6 +124,10 @@ private constructor(
         private var paymentId: CzPaymentId? = null
         private var url: URL? = null
         private val customAttrs = mutableListOf<CustomAttribute>()
+
+        public fun descriptorType(descriptorType: DescriptorType): Builder = apply {
+            this.descriptorType = descriptorType
+        }
 
         public fun account(account: IbanBic): Builder = apply { acc = account }
 
@@ -161,6 +176,7 @@ private constructor(
             val acc = acc ?: throw SpaydException("ACC: Account attribute is required.")
 
             return Spayd(
+                descriptorType = descriptorType,
                 account = acc,
                 altAccounts = altAccs.takeIf { it.isNotEmpty() }?.toSet(),
                 amount = amount,
@@ -193,7 +209,12 @@ private constructor(
 
         @Throws(SpaydException::class)
         public fun encode(spayd: Spayd): String = buildString {
-            append("SPD*1.0*")
+            val header =
+                when (spayd.descriptorType) {
+                    DescriptorType.PAYMENT -> "SPD*1.0*"
+                    DescriptorType.COLLECTION -> "SCD*1.0*"
+                }
+            append(header)
             val parts = mutableListOf<Pair<String, String>>()
             parts.add("ACC" to spayd.account.encode())
             if (!spayd.altAccounts.isNullOrEmpty()) {
@@ -887,8 +908,11 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             throw SpaydException("Illegal character at index $index. SPAYD requires ISO-8859-1 charset.")
         }
     }
-    val basicRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
-    req(spayd.matches(basicRegex)) { "Missing required prefix 'SPD*{VERSION}*'" }
+    val basicPaymentRegex = Regex("^SPD\\*[0-9]+\\.[0-9]+\\*.+$")
+    val basicCollectionRegex = Regex("^SCD\\*[0-9]+\\.[0-9]+\\*.+$")
+    val matchesSpd = spayd.matches(basicPaymentRegex)
+    val matchesScd = spayd.matches(basicCollectionRegex)
+    req(matchesSpd || matchesScd) { "Invalid SPAYD. Must begin with one of ['SPD*{VERSION}*', 'SCD*{VERSION}*']" }
     val spayd = preprocessForDecoding(spayd)
     val spaydEntries = spayd.split('*').drop(2).withIndex().map { ParsedSpaydEntry.fromIndexedValue(it, logger) }
     val duplicates = spaydEntries.filterNot { it.key.isCustomKey() }.groupBy { it.key }.filter { it.value.size > 1 }
@@ -906,6 +930,17 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     var receivedAltAccounts: List<IbanBic>? = null
     val result = Spayd.Builder()
 
+    val descriptorType =
+        when {
+            matchesSpd -> Spayd.DescriptorType.PAYMENT
+            matchesScd -> Spayd.DescriptorType.COLLECTION
+            else -> {
+                val message =
+                    "Missing required prefix. SPAYD must begin with one of ['SPD*{VERSION}*', 'SCD*{VERSION}*']"
+                throw SpaydException(message)
+            }
+        }
+    result.descriptorType(descriptorType)
     for (entry in spaydEntries) {
         val value = entry.percentDecodedValue
         when (entry.key) {
