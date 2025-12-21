@@ -774,18 +774,37 @@ public data class CustomAttribute private constructor(val key: String, val value
 
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object {
+        private val predefinedKeys =
+            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
+
+        private fun requireValidKey(key: String, index: Int, logger: Logger?): String {
+            val validChars = ('A'..'Z') + '-'
+            for ((cindex, c) in key.withIndex()) {
+                req(c in validChars) {
+                    "Key-value at index $index contains illegal character '$c' at index ${cindex}. Allowed key characters: [A-Z-]"
+                }
+            }
+
+            req(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
+            if (key.contains("--")) {
+                logger?.warn("User-defined key '$key' contains '--'. This is allowed but suspicious.")
+            }
+            return key
+        }
+
         fun fromIndexedValue(value: IndexedValue<String>, logger: Logger?): ParsedSpaydEntry {
             // specialized message for empty values, it is more informative than "missing delimiter"
             req(value.value.isNotEmpty()) { "Key-value pair at index ${value.index} is empty (**)" }
             val parts = value.value.split(':', limit = 2)
             req(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
-            checkKey(value.index, parts[0], logger)
-            val decoded = try {
+
+            val key = requireValidKey(parts[0], value.index, logger)
+            val decodedValue = try {
                 spaydPercentDecode(parts[1])
             } catch (e: SpaydException) {
                 throw SpaydException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
             }
-            return ParsedSpaydEntry(index = value.index, key = parts[0], percentDecodedValue = decoded)
+            return ParsedSpaydEntry(index = value.index, key = key, percentDecodedValue = decodedValue)
         }
     }
 }
@@ -888,23 +907,6 @@ private inline fun isAsciiDigit(char: Char): Boolean = char in '0'..'9'
 @Suppress("NOTHING_TO_INLINE")
 private inline fun isAsciiDigits(string: String): Boolean = string.all(::isAsciiDigit)
 
-private val predefinedKeys =
-    setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
-
-private fun checkKey(index: Int, key: String, logger: Logger?) {
-    val validChars = ('A'..'Z') + '-'
-    for ((cindex, c) in key.withIndex()) {
-        req(c in validChars) {
-            "Key-value at index $index contains illegal character '$c' at index ${cindex}. Allowed key characters: [A-Z-]"
-        }
-    }
-
-    req(key in predefinedKeys || key.startsWith("X-")) { "Custom keys must start with 'X-'." }
-    if (key.contains("--")) {
-        logger?.warn("User-defined key '$key' contains '--'. This is allowed but suspicious.")
-    }
-}
-
 private val spaydAllowedChars: Set<Char> =
     ('\u0000'..'\u007F')
         .toSet()
@@ -948,7 +950,6 @@ internal fun spaydPercentEncode(content: String, optimizeForQr: Boolean): String
 
 private inline fun String.thenIf(condition: Boolean, block: (String) -> String): String =
     if (condition) block(this) else this
-
 
 private fun hexDigitToChar(digit: Int): Char = when (digit) {
     in 0..9 -> '0' + digit
