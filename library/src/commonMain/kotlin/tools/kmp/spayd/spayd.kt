@@ -18,7 +18,7 @@ private constructor(
     /** CC */
     public val currency: Currency?,
     /** DT: Datum splatnosti */
-    public val dueDate: DueDate?,
+    public val dueDate: LocalDate?,
     /** MSG */
     public val message: Message?,
     /** NT */
@@ -110,7 +110,7 @@ private constructor(
         private var altAccs = mutableSetOf<IbanBic>()
         private var amount: Amount? = null
         private var currency: Currency? = null
-        private var dueDate: DueDate? = null
+        private var dueDate: LocalDate? = null
         private var message: Message? = null
         private var notificationType: NotificationType? = null
         private var notificationAddress: NotificationAddress? = null
@@ -137,7 +137,7 @@ private constructor(
 
         public fun currency(currency: Currency): Builder = apply { this.currency = currency }
 
-        public fun dueDate(dueDate: DueDate): Builder = apply { this.dueDate = dueDate }
+        public fun dueDate(dueDate: LocalDate): Builder = apply { this.dueDate = dueDate }
 
         public fun message(message: Message): Builder = apply { this.message = message }
 
@@ -280,7 +280,7 @@ private constructor(
             return spaydPercentEncode(content, true)
         }
 
-        private inline fun DueDate.encode(): String =
+        private inline fun LocalDate.encode(): String =
             "$year${monthNumber.toString().padStart(2, '0')}${dayOfMonth.toString().padStart(2, '0')}"
 
         private inline fun NotificationType.encode(): String =
@@ -627,7 +627,7 @@ public value class Currency private constructor(public val code: String) {
 }
 
 @ConsistentCopyVisibility
-public data class DueDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
+public data class LocalDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
     /** ISO 8601 format: YYYY-MM-DD */
     override fun toString(): String =
         "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
@@ -636,11 +636,11 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
 
         @JvmStatic
         @Throws(SpaydException::class)
-        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): DueDate = create(year, monthNumber, dayOfMonth)
+        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): LocalDate = create(year, monthNumber, dayOfMonth)
 
         @JvmStatic
         @Throws(SpaydException::class)
-        internal fun fromString(value: String): DueDate {
+        internal fun fromString(value: String): LocalDate {
             req(value.length == 8 && value.all { it in '0'..'9' }) { "Date must be exactly 8 digits (YYYYMMDD)." }
             val year = value.take(4).toInt()
             val month = value.drop(4).take(2).toInt()
@@ -648,11 +648,11 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
             return create(year, month, day)
         }
 
-        private fun create(year: Int, month: Int, day: Int): DueDate {
+        private fun create(year: Int, month: Int, day: Int): LocalDate {
             req(year >= 1900) { "Unreasonable year: $year." }
             req(month in 1..12) { "Month number must be between 1 and 12." }
             req(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
-            return DueDate(year = year, monthNumber = month, dayOfMonth = day)
+            return LocalDate(year = year, monthNumber = month, dayOfMonth = day)
         }
 
         private fun daysInMonth(year: Int, monthNumber: Int): Int =
@@ -956,7 +956,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "AM" -> result.amount(Amount.fromString(value))
             "CC" -> result.currency(Currency.fromString(value))
             "CRC32" -> receivedCrc32 = value
-            "DT" -> result.dueDate(DueDate.fromString(value))
+            "DT" -> result.dueDate(LocalDate.fromString(value))
             "MSG" -> result.message(Message.fromString(value))
             "NT" -> receivedNt = value
             "NTA" -> receivedNta = value

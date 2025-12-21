@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class DueDateTest {
+class LocalDateTest {
 
     @Test
     fun `test valid date strings are parsed correctly`() {
@@ -56,19 +56,17 @@ class DueDateTest {
 
     // Helper functions
     private fun assertLocalDate(expectedYear: Int, expectedMonth: Int, expectedDay: Int, dateString: String) {
-        val date = DueDate.fromString(dateString)
+        val date = LocalDate.fromString(dateString)
         assertEquals(expectedYear, date.year)
         assertEquals(expectedMonth, date.monthNumber)
         assertEquals(expectedDay, date.dayOfMonth)
     }
 
     private fun assertInvalidDate(dateString: String, expectedMessage: String) {
-        val exception = assertFailsWith<SpaydException>("failed for input: $dateString") {
-            DueDate.fromString(dateString)
-        }
+        val exception =
+            assertFailsWith<SpaydException>("failed for input: $dateString") { LocalDate.fromString(dateString) }
 
         assertEquals(expectedMessage, exception.message)
         println(exception.message)
     }
-
 }
