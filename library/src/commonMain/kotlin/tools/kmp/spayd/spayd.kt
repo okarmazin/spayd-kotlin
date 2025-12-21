@@ -21,6 +21,8 @@ private constructor(
     public val dueDate: LocalDate?,
     /** DL: Ukonceni platnosti trvaleho prikazu / ukonceni svoleni k inkasu */
     public val validUntil: LocalDate?,
+    /** FRQ */
+    public val frequency: Frequency?,
     /** MSG */
     public val message: Message?,
     /** NT */
@@ -71,6 +73,7 @@ private constructor(
         if (currency != other.currency) return false
         if (dueDate != other.dueDate) return false
         if (validUntil != other.validUntil) return false
+        if (frequency != other.frequency) return false
         if (message != other.message) return false
         if (notificationType != other.notificationType) return false
         if (notificationAddress != other.notificationAddress) return false
@@ -98,6 +101,7 @@ private constructor(
         result = 31 * result + currency.hashCode()
         result = 31 * result + dueDate.hashCode()
         result = 31 * result + validUntil.hashCode()
+        result = 31 * result + frequency.hashCode()
         result = 31 * result + message.hashCode()
         result = 31 * result + notificationType.hashCode()
         result = 31 * result + notificationAddress.hashCode()
@@ -124,6 +128,7 @@ private constructor(
         private var currency: Currency? = null
         private var dueDate: LocalDate? = null
         private var validUntil: LocalDate? = null
+        private var frequency: Frequency? = null
         private var message: Message? = null
         private var notificationType: NotificationType? = null
         private var notificationAddress: NotificationAddress? = null
@@ -154,6 +159,10 @@ private constructor(
 
         public fun dueDate(dueDate: LocalDate): Builder = apply { this.dueDate = dueDate }
 
+        public fun validUntil(validUntil: LocalDate): Builder = apply { this.validUntil = validUntil }
+
+        public fun frequency(frequency: Frequency): Builder = apply { this.frequency = frequency }
+
         public fun message(message: Message): Builder = apply { this.message = message }
 
         public fun notification(notificationType: NotificationType, notificationAddress: NotificationAddress): Builder =
@@ -165,8 +174,6 @@ private constructor(
         public fun paymentType(paymentType: PaymentType): Builder = apply { this.paymentType = paymentType }
 
         public fun persistAfterDeath(shouldPersist: Boolean): Builder = apply { this.persistAfterDeath = shouldPersist }
-
-        public fun validUntil(validUntil: LocalDate): Builder = apply { this.validUntil = validUntil }
 
         public fun senderReference(senderReference: SenderReference): Builder = apply {
             this.senderReference = senderReference
@@ -204,6 +211,7 @@ private constructor(
                 currency = currency,
                 dueDate = dueDate,
                 validUntil = validUntil,
+                frequency = frequency,
                 message = message,
                 notificationType = notificationType,
                 notificationAddress = notificationAddress,
@@ -247,6 +255,7 @@ private constructor(
             if (spayd.amount != null) parts.add("AM" to spayd.amount.encode())
             if (spayd.currency != null) parts.add("CC" to spayd.currency.encode())
             if (spayd.validUntil != null) parts.add("DL" to spayd.validUntil.encode())
+            if (spayd.frequency != null) parts.add("FRQ" to spayd.frequency.encodedValue)
             if (spayd.dueDate != null) parts.add("DT" to spayd.dueDate.encode())
             if (spayd.message != null) parts.add("MSG" to spayd.message.encode(optimizeForQr))
             if (spayd.notificationType != null) parts.add("NT" to spayd.notificationType.encode())
@@ -667,12 +676,15 @@ public data class LocalDate private constructor(val year: Int, val monthNumber: 
 
         @JvmStatic
         @Throws(SpaydException::class)
-        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): LocalDate = create("LocalDate", year, monthNumber, dayOfMonth)
+        public fun of(year: Int, monthNumber: Int, dayOfMonth: Int): LocalDate =
+            create("LocalDate", year, monthNumber, dayOfMonth)
 
         @JvmStatic
         @Throws(SpaydException::class)
         internal fun fromString(attrName: String, value: String): LocalDate {
-            req(value.length == 8 && value.all { it in '0'..'9' }) { "$attrName: Date must be exactly 8 digits (YYYYMMDD)." }
+            req(value.length == 8 && value.all { it in '0'..'9' }) {
+                "$attrName: Date must be exactly 8 digits (YYYYMMDD)."
+            }
             val year = value.take(4).toInt()
             val month = value.drop(4).take(2).toInt()
             val day = value.takeLast(2).toInt()
@@ -695,6 +707,20 @@ public data class LocalDate private constructor(val year: Int, val monthNumber: 
             }
 
         private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
+    }
+}
+
+public enum class Frequency(internal val encodedValue: String) {
+    DAILY("1D"),
+    MONTHLY("1M"),
+    QUARTERLY("3M"),
+    SEMI_ANNUALLY("6M"),
+    ANNUALLY("1Y");
+
+    internal companion object {
+        internal fun fromString(string: String): Frequency =
+            entries.firstOrNull { it.encodedValue == string }
+                ?: throw SpaydException("FRQ: Invalid frequency. Must be one of ${entries.map { it.encodedValue }}.")
     }
 }
 
@@ -906,7 +932,7 @@ public data class CustomAttribute private constructor(val key: String, val value
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object {
         private val predefinedKeys =
-            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DH", "DL", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
+            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DH", "DL", "DT", "FRQ", "MSG", "NT", "NTA", "PT", "RF", "RN")
 
         private fun requireValidKey(key: String, index: Int, logger: Logger?): String {
             if (key in predefinedKeys) return key
@@ -1013,6 +1039,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "DH" -> result.persistAfterDeath(value.persistAfterDeath())
             "DL" -> result.validUntil(LocalDate.fromString("DL", value))
             "DT" -> result.dueDate(LocalDate.fromString("DT", value))
+            "FRQ" -> result.frequency(Frequency.fromString(value))
             "MSG" -> result.message(Message.fromString(value))
             "NT" -> receivedNt = value
             "NTA" -> receivedNta = value

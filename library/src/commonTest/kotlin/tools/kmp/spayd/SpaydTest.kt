@@ -431,4 +431,34 @@ class SpaydTest {
             assertNull(spayd.validUntil)
         }
     }
+
+    @Test
+    fun `test frequency encoding`() {
+        val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            for (frq in Frequency.entries) {
+                val spayd = Spayd.Builder().account(tmobileAcc).frequency(frq).build()
+                assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*FRQ:${frq.encodedValue}*", encoder.encode(spayd))
+            }
+        }
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*", encoder.encode(spayd))
+        }
+    }
+
+    @Test
+    fun `test frequency decoding`() {
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        run {
+            for (frq in Frequency.entries) {
+                val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*FRQ:${frq.encodedValue}*")
+                assertEquals(frq, spayd.frequency)
+            }
+        }
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*")
+            assertNull(spayd.validUntil)
+        }
+    }
 }
