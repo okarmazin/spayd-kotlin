@@ -354,15 +354,24 @@ private inline fun req(value: Boolean, lazyMessage: () -> Any) =
     }
 
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
-    internal companion object {
+    public companion object {
         @JvmStatic
         @Throws(SpaydException::class)
-        fun fromString(value: String): IbanBic {
+        public fun fromString(value: String): IbanBic {
             val parts = value.split('+', limit = 2)
             val iban = parts[0]
             val bic = parts.getOrNull(1)
             return IbanBic(IBAN.fromString(iban), bic?.let(BIC::fromString))
         }
+
+        @JvmStatic
+        @Throws(SpaydException::class)
+        public fun fromCzAccount(account: CZBankAccount): IbanBic = IbanBic(IBAN.from(account), null)
+
+        @JvmStatic
+        @Throws(SpaydException::class)
+        public fun fromCzAccount(accountNumber: String, bankCode: String): IbanBic =
+            fromCzAccount(CZBankAccount.fromParts(accountNumber, bankCode))
     }
 }
 
@@ -453,11 +462,10 @@ public data class BIC private constructor(val value: String) {
 public data class CZBankAccount private constructor(val accountNumber: CZBankAccountNumber, val bankCode: BankCode) {
     public override fun toString(): String = "$accountNumber/$bankCode"
 
-    internal companion object {
-
+    public companion object {
         @JvmStatic
         @Throws(SpaydException::class)
-        fun fromString(string: String): CZBankAccount {
+        public fun fromString(string: String): CZBankAccount {
             val string = string.trim()
             val splits = string.split('/')
             req(splits.size == 2) {
@@ -469,7 +477,15 @@ public data class CZBankAccount private constructor(val accountNumber: CZBankAcc
             return CZBankAccount(number, bankCode)
         }
 
-        fun fromParts(number: CZBankAccountNumber, bankCode: BankCode) = CZBankAccount(number, bankCode)
+        @JvmStatic
+        @Throws(SpaydException::class)
+        public fun fromParts(accountNumber: CZBankAccountNumber, bankCode: BankCode): CZBankAccount =
+            CZBankAccount(accountNumber, bankCode)
+
+        @JvmStatic
+        @Throws(SpaydException::class)
+        public fun fromParts(accountNumber: String, bankCode: String): CZBankAccount =
+            fromParts(CZBankAccountNumber.fromString(accountNumber), BankCode.fromString(bankCode))
     }
 }
 
