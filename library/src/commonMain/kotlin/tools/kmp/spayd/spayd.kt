@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * @author Ondřej Karmazín
- */
+/** @author Ondřej Karmazín */
 package tools.kmp.spayd
 
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmStatic
 
-public class Spayd private constructor(
+public class Spayd
+private constructor(
     /** ACC: Account, the only required attribute */
     public val account: IbanBic,
     /** ALT-ACC */
@@ -43,7 +42,6 @@ public class Spayd private constructor(
     public val paymentId: CzPaymentId?,
     /** X-URL */
     public val url: URL?,
-
     public val customAttributes: List<CustomAttribute>?,
 ) {
     public companion object;
@@ -117,11 +115,17 @@ public class Spayd private constructor(
         private val customAttrs = mutableListOf<CustomAttribute>()
 
         public fun account(account: IbanBic): Builder = apply { acc = account }
+
         public fun altAccount(altAccount: IbanBic): Builder = apply { altAccs.add(altAccount) }
+
         public fun amount(amount: Amount): Builder = apply { this.amount = amount }
+
         public fun currency(currency: Currency): Builder = apply { this.currency = currency }
+
         public fun dueDate(dueDate: DueDate): Builder = apply { this.dueDate = dueDate }
+
         public fun message(message: Message): Builder = apply { this.message = message }
+
         public fun notification(notificationType: NotificationType, notificationAddress: NotificationAddress): Builder =
             apply {
                 this.notificationType = notificationType
@@ -129,35 +133,59 @@ public class Spayd private constructor(
             }
 
         public fun paymentType(paymentType: PaymentType): Builder = apply { this.paymentType = paymentType }
-        public fun senderReference(senderReference: SenderReference): Builder =
-            apply { this.senderReference = senderReference }
+
+        public fun senderReference(senderReference: SenderReference): Builder = apply {
+            this.senderReference = senderReference
+        }
 
         public fun recipient(recipient: Recipient): Builder = apply { this.recipient = recipient }
+
         public fun vs(vs: VS): Builder = apply { this.vs = vs }
+
         public fun ss(ss: SS): Builder = apply { this.ss = ss }
+
         public fun ks(ks: KS): Builder = apply { this.ks = ks }
+
         public fun retryDays(retryDays: CzRetryDays): Builder = apply { this.retryDays = retryDays }
+
         public fun paymentId(paymentId: CzPaymentId): Builder = apply { this.paymentId = paymentId }
+
         public fun url(url: URL): Builder = apply { this.url = url }
-        public fun customAttribute(customAttribute: CustomAttribute): Builder =
-            apply { customAttrs.add(customAttribute) }
+
+        public fun customAttribute(customAttribute: CustomAttribute): Builder = apply {
+            customAttrs.add(customAttribute)
+        }
 
         @Throws(SpaydException::class)
         public fun build(): Spayd {
             val acc = acc ?: throw SpaydException("ACC: Account attribute is required.")
 
             return Spayd(
-                acc,
-                altAccs.takeIf { it.isNotEmpty() }?.toSet(),
-                amount, currency, dueDate, message, notificationType, notificationAddress, paymentType,
-                senderReference, recipient, vs, ss, ks, retryDays, paymentId, url,
-                customAttrs.takeIf { it.isNotEmpty() }
+                account = acc,
+                altAccounts = altAccs.takeIf { it.isNotEmpty() }?.toSet(),
+                amount = amount,
+                currency = currency,
+                dueDate = dueDate,
+                message = message,
+                notificationType = notificationType,
+                notificationAddress = notificationAddress,
+                paymentType = paymentType,
+                senderReference = senderReference,
+                recipient = recipient,
+                vs = vs,
+                ss = ss,
+                ks = ks,
+                retryDays = retryDays,
+                paymentId = paymentId,
+                url = url,
+                customAttributes = customAttrs.takeIf { it.isNotEmpty() },
             )
         }
     }
 
     @Suppress("NOTHING_TO_INLINE")
-    public class Encoder private constructor(
+    public class Encoder
+    private constructor(
         public val optimizeForQr: Boolean,
         public val logger: Logger?,
         public val includeCrc32: Boolean,
@@ -207,15 +235,25 @@ public class Spayd private constructor(
         }
 
         private inline fun Amount.encode(): String = value
+
         private inline fun Currency.encode(): String = code.uppercase()
+
         private inline fun Message.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
         private inline fun Recipient.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
         private inline fun VS.encode(): String = value
+
         private inline fun SS.encode(): String = value
+
         private inline fun KS.encode(): String = value
+
         private inline fun CzRetryDays.encode(): String = value.toString()
+
         private inline fun CzPaymentId.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
         private inline fun URL.encode(optimizeForQr: Boolean): String = spaydPercentEncode(value, optimizeForQr)
+
         private inline fun IbanBic.encode(): String {
             val content = iban.value + (bic?.value?.let { "+$it" } ?: "")
             return spaydPercentEncode(content, true)
@@ -224,18 +262,20 @@ public class Spayd private constructor(
         private inline fun DueDate.encode(): String =
             "$year${monthNumber.toString().padStart(2, '0')}${dayOfMonth.toString().padStart(2, '0')}"
 
-        private inline fun NotificationType.encode(): String = when (this) {
-            NotificationType.PHONE -> "P"
-            NotificationType.EMAIL -> "E"
-        }
+        private inline fun NotificationType.encode(): String =
+            when (this) {
+                NotificationType.PHONE -> "P"
+                NotificationType.EMAIL -> "E"
+            }
 
         private inline fun NotificationAddress.encode(optimizeForQr: Boolean): String =
             spaydPercentEncode(value, optimizeForQr)
 
-        private inline fun PaymentType.encode(): String = when (this) {
-            is PaymentType.Custom -> value.uppercase()
-            PaymentType.InstantPayment -> "IP"
-        }
+        private inline fun PaymentType.encode(): String =
+            when (this) {
+                is PaymentType.Custom -> value.uppercase()
+                PaymentType.InstantPayment -> "IP"
+            }
 
         private inline fun SenderReference.encode(optimizeForQr: Boolean): String =
             spaydPercentEncode(value, optimizeForQr)
@@ -249,19 +289,18 @@ public class Spayd private constructor(
             private var includeCrc32: Boolean = false
 
             public fun logger(logger: Logger?): Builder = apply { this.logger = logger }
+
             public fun optimizeForQr(optimizeForQr: Boolean): Builder = apply { this.optimizeForQr = optimizeForQr }
+
             public fun includeCrc32(shouldInclude: Boolean): Builder = apply { this.includeCrc32 = shouldInclude }
 
             public fun build(): Encoder = Encoder(optimizeForQr, logger, includeCrc32)
         }
     }
 
-    public class Decoder private constructor(
-        public val logger: Logger? = null,
-    ) {
+    public class Decoder private constructor(public val logger: Logger? = null) {
 
-        @Throws(SpaydException::class)
-        public fun decode(spayd: String): Spayd = decodeSpayd(spayd, logger)
+        @Throws(SpaydException::class) public fun decode(spayd: String): Spayd = decodeSpayd(spayd, logger)
 
         public class Builder {
             private var logger: Logger? = null
@@ -275,36 +314,44 @@ public class Spayd private constructor(
 
 public interface Logger {
     public fun debug(message: String, throwable: Throwable? = null)
+
     public fun info(message: String, throwable: Throwable? = null)
+
     public fun warn(message: String, throwable: Throwable? = null)
+
     public fun error(message: String, throwable: Throwable? = null)
 
     public companion object {
-        public val PRINTLN: Logger = object : Logger {
-            private fun log(prefix: String, message: String, throwable: Throwable?) {
-                val throwableMessage = throwable?.let { "\n${it.stackTraceToString()}" } ?: ""
-                println("$prefix $message$throwableMessage")
-            }
+        public val PRINTLN: Logger =
+            object : Logger {
+                private fun log(prefix: String, message: String, throwable: Throwable?) {
+                    val throwableMessage = throwable?.let { "\n${it.stackTraceToString()}" } ?: ""
+                    println("$prefix $message$throwableMessage")
+                }
 
-            override fun debug(message: String, throwable: Throwable?): Unit = log("[DEBUG]", message, throwable)
-            override fun info(message: String, throwable: Throwable?): Unit = log("[INFO]", message, throwable)
-            override fun warn(message: String, throwable: Throwable?): Unit = log("[WARN]", message, throwable)
-            override fun error(message: String, throwable: Throwable?): Unit = log("[ERROR]", message, throwable)
-        }
+                override fun debug(message: String, throwable: Throwable?): Unit = log("[DEBUG]", message, throwable)
+
+                override fun info(message: String, throwable: Throwable?): Unit = log("[INFO]", message, throwable)
+
+                override fun warn(message: String, throwable: Throwable?): Unit = log("[WARN]", message, throwable)
+
+                override fun error(message: String, throwable: Throwable?): Unit = log("[ERROR]", message, throwable)
+            }
     }
 }
 
 /**
- * Base exception thrown from the library. If a thrown exception is not an instance of [SpaydException],
- * it is likely a bug and should be reported.
+ * Base exception thrown from the library. If a thrown exception is not an instance of [SpaydException], it is likely a
+ * bug and should be reported.
  */
 public class SpaydException(message: String?, cause: Throwable? = null) : IllegalArgumentException(message, cause)
 
-private inline fun req(value: Boolean, lazyMessage: () -> Any) = try {
-    require(value, lazyMessage)
-} catch (e: IllegalArgumentException) {
-    throw SpaydException(e.message, e)
-}
+private inline fun req(value: Boolean, lazyMessage: () -> Any) =
+    try {
+        require(value, lazyMessage)
+    } catch (e: IllegalArgumentException) {
+        throw SpaydException(e.message, e)
+    }
 
 public data class IbanBic(val iban: IBAN, val bic: BIC? = null) {
     internal companion object {
@@ -394,17 +441,16 @@ public data class BIC private constructor(val value: String) {
             val letters = string.take(6)
             val alphanum = string.drop(6)
             req(letters.all { it in 'A'..'Z' }) { "BIC must start with 6 uppercase letters." }
-            req(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) { "BIC must end with 2 or 5 alphanumeric characters." }
+            req(alphanum.all { it in 'A'..'Z' || it in '0'..'9' }) {
+                "BIC must end with 2 or 5 alphanumeric characters."
+            }
             return BIC(string)
         }
     }
 }
 
 @ConsistentCopyVisibility
-public data class CZBankAccount private constructor(
-    val accountNumber: CZBankAccountNumber,
-    val bankCode: BankCode
-) {
+public data class CZBankAccount private constructor(val accountNumber: CZBankAccountNumber, val bankCode: BankCode) {
     public override fun toString(): String = "$accountNumber/$bankCode"
 
     internal companion object {
@@ -457,27 +503,31 @@ public data class CZBankAccountNumber private constructor(val prefix: String, va
 
                 else -> {
                     // If this ever happens, the regex engine has a bug.
-                    throw SpaydException("CZ bank number regex matched, but split into more than 2 parts (${parts.size}).")
+                    val message = "CZ bank number regex matched, but split into more than 2 parts (${parts.size})."
+                    throw SpaydException(message)
                 }
             }
         }
 
         private fun validatePart(part: String, maxLength: Int, minNotZeroDigits: Int) {
-            req(part.length <= maxLength) { "Invalid CZ bank account number part length (${part.length}). Must be <= $maxLength." }
-            var notZeroCount = 0
-            val sum = part.padStart(maxLength, '0').reversed().foldIndexed(0) { index, acc, c ->
-                if (c != '0') notZeroCount++
-                acc + c.digitToInt() * weights[index]
+            req(part.length <= maxLength) {
+                "Invalid CZ bank account number part length (${part.length}). Must be <= $maxLength."
             }
-            req(notZeroCount >= minNotZeroDigits) { "Invalid CZ bank account number - must have at least $minNotZeroDigits non-zero digits." }
+            var notZeroCount = 0
+            val sum =
+                part.padStart(maxLength, '0').reversed().foldIndexed(0) { index, acc, c ->
+                    if (c != '0') notZeroCount++
+                    acc + c.digitToInt() * weights[index]
+                }
+            req(notZeroCount >= minNotZeroDigits) {
+                "Invalid CZ bank account number - must have at least $minNotZeroDigits non-zero digits."
+            }
             req(sum % 11 == 0) { "Invalid CZ bank account number - check digit is invalid." }
         }
     }
 }
 
-/**
- * Cesky kod banky (kod platebniho styku) - 4 cislice
- */
+/** Cesky kod banky (kod platebniho styku) - 4 cislice */
 @ConsistentCopyVisibility
 public data class BankCode private constructor(val value: String) {
     override fun toString(): String = value
@@ -497,12 +547,13 @@ public data class BankCode private constructor(val value: String) {
 @JvmInline
 public value class Amount private constructor(public val value: String) {
     public companion object {
-        // @formatter:off
-        public const val ERR_NAN: String = "AM: Amount must not be empty and must only contain digits or up to 1 decimal point. Negative amounts are not allowed."
-        public const val ERR_SINGLE_DECIMAL_POINT: String = "AM: Input must not be a single decimal point '.': While this could be interpreted as a zero decimal amount, it is ambiguous and no reasonable string representation of a decimal number would output this. Leading decimal point is only allowed if it is followed by at least 1 digit."
+        public const val ERR_NAN: String =
+            "AM: Amount must not be empty and must only contain digits or up to 1 decimal point. Negative amounts are not allowed."
+        public const val ERR_SINGLE_DECIMAL_POINT: String =
+            "AM: Input must not be a single decimal point '.': While this could be interpreted as a zero decimal amount, it is ambiguous and no reasonable string representation of a decimal number would output this. Leading decimal point is only allowed if it is followed by at least 1 digit."
         public const val ERR_TOO_MANY_DECIMALS: String = "AM: Amount must have at most 2 decimal places."
-        public const val ERR_TOO_LONG: String = "AM: Amount must be 1 to 10 characters after normalization. SPAYD requires 1..10 characters including the decimal point and decimal expansion i.e. <10>, <8>.<1>, <7>.<2>"
-        // @formatter:on
+        public const val ERR_TOO_LONG: String =
+            "AM: Amount must be 1 to 10 characters after normalization. SPAYD requires 1..10 characters including the decimal point and decimal expansion i.e. <10>, <8>.<1>, <7>.<2>"
 
         @JvmStatic
         @Throws(SpaydException::class)
@@ -540,9 +591,7 @@ public value class Currency private constructor(public val code: String) {
 
 @ConsistentCopyVisibility
 public data class DueDate private constructor(val year: Int, val monthNumber: Int, val dayOfMonth: Int) {
-    /**
-     * ISO 8601 format: YYYY-MM-DD
-     */
+    /** ISO 8601 format: YYYY-MM-DD */
     override fun toString(): String =
         "$year-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
 
@@ -566,19 +615,16 @@ public data class DueDate private constructor(val year: Int, val monthNumber: In
             req(year >= 1900) { "Unreasonable year: $year." }
             req(month in 1..12) { "Month number must be between 1 and 12." }
             req(day in 1..daysInMonth(year, month)) { "Invalid day of month: $day" }
-            return DueDate(
-                year = year,
-                monthNumber = month,
-                dayOfMonth = day,
-            )
+            return DueDate(year = year, monthNumber = month, dayOfMonth = day)
         }
 
-        private fun daysInMonth(year: Int, monthNumber: Int): Int = when (monthNumber) {
-            1, 3, 5, 7, 8, 10, 12 -> 31
-            4, 6, 9, 11 -> 30
-            2 -> if (isLeapYear(year)) 29 else 28
-            else -> throw SpaydException("Invalid month number: $monthNumber")
-        }
+        private fun daysInMonth(year: Int, monthNumber: Int): Int =
+            when (monthNumber) {
+                in setOf(1, 3, 5, 7, 8, 10, 12) -> 31
+                in setOf(4, 6, 9, 11) -> 30
+                2 -> if (isLeapYear(year)) 29 else 28
+                else -> throw SpaydException("Invalid month number: $monthNumber")
+            }
 
         private fun isLeapYear(year: Int): Boolean = (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
     }
@@ -608,11 +654,12 @@ public enum class NotificationType {
     public companion object {
         @JvmStatic
         @Throws(SpaydException::class)
-        internal fun fromString(value: String): NotificationType = when (value) {
-            "P" -> PHONE
-            "E" -> EMAIL
-            else -> throw SpaydException("NT: Invalid notification type. Must be one of [P, E]")
-        }
+        internal fun fromString(value: String): NotificationType =
+            when (value) {
+                "P" -> PHONE
+                "E" -> EMAIL
+                else -> throw SpaydException("NT: Invalid notification type. Must be one of [P, E]")
+            }
     }
 }
 
@@ -765,7 +812,9 @@ public data class CustomAttribute private constructor(val key: String, val value
         @JvmStatic
         @Throws(SpaydException::class)
         public fun create(key: String, value: String): CustomAttribute {
-            req(key !in reservedKeys) { "Custom attribute key '$key' is reserved. Please use a different key for your own attribute." }
+            req(key !in reservedKeys) {
+                "Custom attribute key '$key' is reserved. Please use a different key for your own attribute."
+            }
             req(key.startsWith("X-")) { "Custom attribute key must start with 'X-'." }
             return CustomAttribute(key, value)
         }
@@ -799,11 +848,12 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
             req(parts.size == 2) { "Invalid key-value pair at index ${value.index}: missing ':' delimiter." }
 
             val key = requireValidKey(parts[0], value.index, logger)
-            val decodedValue = try {
-                spaydPercentDecode(parts[1])
-            } catch (e: SpaydException) {
-                throw SpaydException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
-            }
+            val decodedValue =
+                try {
+                    spaydPercentDecode(parts[1])
+                } catch (e: SpaydException) {
+                    throw SpaydException("Invalid key-value pair at index ${value.index}: ${e.message}", e)
+                }
             return ParsedSpaydEntry(index = value.index, key = key, percentDecodedValue = decodedValue)
         }
     }
@@ -826,11 +876,10 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
     val spaydEntries = spayd.split('*').drop(2).withIndex().map { ParsedSpaydEntry.fromIndexedValue(it, logger) }
     val duplicates = spaydEntries.filterNot { it.key.isCustomKey() }.groupBy { it.key }.filter { it.value.size > 1 }
     req(duplicates.isEmpty()) {
-        val report = duplicates.entries.joinToString(
-            separator = "; ",
-            prefix = "[",
-            postfix = "]"
-        ) { (key, values) -> "$key: at indexes ${values.joinToString { it.index.toString() }}" }
+        val report =
+            duplicates.entries.joinToString(separator = "; ", prefix = "[", postfix = "]") { (key, values) ->
+                "$key: at indexes ${values.joinToString { it.index.toString() }}"
+            }
         "Duplicate keys found: $report"
     }
 
@@ -880,7 +929,9 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
         }
 
         receivedNt != null || receivedNta != null -> {
-            throw SpaydException("NT/NTA: Both NT and NTA attributes must be specified, or neither. Having just one makes no real sense")
+            val message =
+                "NT/NTA: Both NT and NTA attributes must be specified, or neither. Having just one makes no real sense"
+            throw SpaydException(message)
         }
     }
     // TODO check CRC32
@@ -901,11 +952,9 @@ private fun preprocessForDecoding(spayd: String): String {
     return spayd
 }
 
-@Suppress("NOTHING_TO_INLINE")
-private inline fun isAsciiDigit(char: Char): Boolean = char in '0'..'9'
+@Suppress("NOTHING_TO_INLINE") private inline fun isAsciiDigit(char: Char): Boolean = char in '0'..'9'
 
-@Suppress("NOTHING_TO_INLINE")
-private inline fun isAsciiDigits(string: String): Boolean = string.all(::isAsciiDigit)
+@Suppress("NOTHING_TO_INLINE") private inline fun isAsciiDigits(string: String): Boolean = string.all(::isAsciiDigit)
 
 private val spaydAllowedChars: Set<Char> =
     ('\u0000'..'\u007F')
@@ -921,12 +970,11 @@ private val spaydAllowedChars: Set<Char> =
 
 // QR alphanumeric: 0–9, A–Z (upper-case only), space, $, %, *, +, -, ., /, :
 // Using this character set allows more efficient QR codes generation
-private val spaydOptimizedAllowedChars: Set<Char> =
-    buildSet {
-        addAll('0'..'9')
-        addAll('A'..'Z')
-        " $-./:".forEach(::add)
-    }
+private val spaydOptimizedAllowedChars: Set<Char> = buildSet {
+    addAll('0'..'9')
+    addAll('A'..'Z')
+    " $-./:".forEach(::add)
+}
 
 internal fun spaydPercentEncode(content: String, optimizeForQr: Boolean): String {
     val content = content.trim().thenIf(optimizeForQr) { it.uppercase() }
@@ -951,17 +999,18 @@ internal fun spaydPercentEncode(content: String, optimizeForQr: Boolean): String
 private inline fun String.thenIf(condition: Boolean, block: (String) -> String): String =
     if (condition) block(this) else this
 
-private fun hexDigitToChar(digit: Int): Char = when (digit) {
-    in 0..9 -> '0' + digit
-    else -> 'A' + digit - 10
-}
+private fun hexDigitToChar(digit: Int): Char =
+    when (digit) {
+        in 0..9 -> '0' + digit
+        else -> 'A' + digit - 10
+    }
 
 internal fun spaydPercentDecode(content: String): String {
     if (!content.contains('%')) return content
     val builder = StringBuilder()
     var pos = 0
-    fun getHexaDigit(pos: Int): Int = content[pos].digitToIntOrNull(16)
-        ?: throw SpaydException("Invalid hexadecimal digit: '${content[pos]}'")
+    fun getHexaDigit(pos: Int): Int =
+        content[pos].digitToIntOrNull(16) ?: throw SpaydException("Invalid hexadecimal digit: '${content[pos]}'")
 
     fun readEncodedByte(): Byte {
         req(pos + 2 < content.length) { "Invalid percent-encoded byte: Missing hexadecimal digit after '%'" }
@@ -995,17 +1044,19 @@ internal fun spaydPercentDecode(content: String): String {
 internal object Crc32Computer {
     private const val POLYNOMIAL = 0xEDB88320.toInt()
 
-    private val lookupTable: IntArray = IntArray(256) { i ->
-        var crc = i
-        repeat(8) {
-            crc = if (crc and 1 == 1) {
-                (crc ushr 1) xor POLYNOMIAL
-            } else {
-                crc ushr 1
+    private val lookupTable: IntArray =
+        IntArray(256) { i ->
+            var crc = i
+            repeat(8) {
+                crc =
+                    if (crc and 1 == 1) {
+                        (crc ushr 1) xor POLYNOMIAL
+                    } else {
+                        crc ushr 1
+                    }
             }
+            crc
         }
-        crc
-    }
 
     fun compute(data: ByteArray): Long {
         var crc = 0xFFFFFFFF.toInt()
@@ -1018,6 +1069,5 @@ internal object Crc32Computer {
 
     fun computeHex(data: ByteArray): String = compute(data).toString(16).uppercase().padStart(8, '0')
 
-    fun computeHex(text: String): String =
-        compute(text.encodeToByteArray()).toString(16).uppercase().padStart(8, '0')
+    fun computeHex(text: String): String = compute(text.encodeToByteArray()).toString(16).uppercase().padStart(8, '0')
 }
