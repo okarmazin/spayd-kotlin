@@ -23,13 +23,13 @@ and it will get added.
 
 ### API Design
 
-<p>The API is designed for consistency and discoverability. You are supposed to be able to search the API surface using
-your IDE's autocompletion. As a rule of thumb, objects are constructed using factory functions, or with a `Builder` pattern. 
-</p>
+The API is designed for consistency and discoverability. You are supposed to be able to search the API surface using
+your IDE's autocompletion. As a rule of thumb, objects are constructed using factory functions, or with a `Builder` pattern.
 
 Class `Spayd` is the entry point into the library. The rest of the API is discoverable with `Spayd.<completion>`
 
 ### Working with the library
+
 ```kotlin
 val constructedSpayd: Spayd =
     Spayd.Builder()
@@ -58,7 +58,8 @@ val encoder = Spayd.Encoder.Builder()
     .includeCrc32(true)
     .logger(Logger.PRINTLN)
     .build()
-val expectedEncoded = "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:B4F793B6*"
+val expectedEncoded =
+    "SPD*1.0*ACC:CZ0608000000192235210247*ALT-ACC:CZ9003000000192235210247,CZ4601000000192235210247*AM:599*CC:CZK*MSG:T-Mobile - QR platba*RN:T-Mobile Czech Republic a.s.*X-CUSTOM:orang utan*X-SS:11*X-VS:1113334445*CRC32:B4F793B6*"
 val actualEncoded = encoder.encode(constructedSpayd)
 assertEquals(expectedEncoded, actualEncoded)
 
@@ -66,7 +67,15 @@ assertEquals(decodedSpayd, decoder.decode(actualEncoded))
 assertEquals(constructedSpayd, decoder.decode(actualEncoded))
 ```
 
-## Serialization
+### Error handling
+The library throws `SpaydException : IllegalArgumentException` from all decoding and encoding operations, and from
+factory functions that fail to construct a valid object (e.g. `Builder.build()` with illegal configuration, 
+or `Amount.fromString("Not a number")`).
+
+If you catch an exception that isn't a `SpaydException`, it's a bug. Please open an issue.
+
+### Serialization
+
 `Spayd` is not `@Serializable` to avoid the `kotlinx.serialization` dependency, but the following should do:
 
 ```kotlin
@@ -74,7 +83,7 @@ object SpaydSerializer : KSerializer<Spayd> {
     // Configure the decoder and encoder to your needs
     private val spaydDecoder = Spayd.Decoder.Builder().build()
     private val spaydEncoder = Spayd.Encoder.Builder().build()
-    
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("tools.kmp.spayd.Spayd", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: Spayd) = encoder.encodeString(spaydEncoder.encode(value))
