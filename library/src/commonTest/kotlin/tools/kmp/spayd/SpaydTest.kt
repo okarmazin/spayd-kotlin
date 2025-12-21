@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class SpaydTest {
     private val iban = IBAN.fromString("CZ9106000000000000000123")
@@ -14,6 +15,7 @@ class SpaydTest {
     private val acc = "ACC:$iban*"
     private val accBic = "ACC:$iban+$bic*"
     private val validFull = "$prefix${acc}AM:450.00*CC:CZK*MSG:PLATBA ZA ZBOZI*X-VS:1234567890"
+    private val tmobileAcc = IbanBic.fromString("CZ0608000000192235210247")
 
     private fun Spayd.Companion.decodeFromString(spayd: String): Spayd =
         Spayd.Decoder.Builder().logger(Logger.PRINTLN).build().decode(spayd)
@@ -332,6 +334,50 @@ class SpaydTest {
 
         assertEquals(decodedSpayd, decoder.decode(actualEncoded))
         assertEquals(constructedSpayd, decoder.decode(actualEncoded))
+    }
+
+    @Test
+    fun `test persistAfterDeath encoding`() {
+        val encoder = Spayd.Encoder.Builder().logger(Logger.PRINTLN).build()
+        // true
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).persistAfterDeath(true).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*DH:1*", encoder.encode(spayd))
+        }
+
+        // false
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).persistAfterDeath(false).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*DH:0*", encoder.encode(spayd))
+        }
+
+        // unset
+        run {
+            val spayd = Spayd.Builder().account(tmobileAcc).build()
+            assertEquals("SPD*1.0*ACC:CZ0608000000192235210247*", encoder.encode(spayd))
+        }
+    }
+
+    @Test
+    fun `test persistAfterDeath decoding`() {
+        val decoder = Spayd.Decoder.Builder().logger(Logger.PRINTLN).build()
+        // true
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*DH:1*")
+            assertEquals(true, spayd.persistAfterDeath)
+        }
+
+        // false
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*DH:0*")
+            assertEquals(false, spayd.persistAfterDeath)
+        }
+
+        // unset
+        run {
+            val spayd = decoder.decode("SPD*1.0*ACC:CZ0608000000192235210247*")
+            assertNull(spayd.persistAfterDeath)
+        }
     }
 
 

@@ -27,6 +27,8 @@ private constructor(
     public val notificationAddress: NotificationAddress?,
     /** PT */
     public val paymentType: PaymentType?,
+    /** DH: Persist after account holder's death. Applicable to collections and recurring payments */
+    public val persistAfterDeath: Boolean?,
     /** RF */
     public val senderReference: SenderReference?,
     /** RN */
@@ -68,6 +70,7 @@ private constructor(
         if (notificationType != other.notificationType) return false
         if (notificationAddress != other.notificationAddress) return false
         if (paymentType != other.paymentType) return false
+        if (persistAfterDeath != other.persistAfterDeath) return false
         if (senderReference != other.senderReference) return false
         if (recipient != other.recipient) return false
         if (vs != other.vs) return false
@@ -92,6 +95,7 @@ private constructor(
         result = 31 * result + notificationType.hashCode()
         result = 31 * result + notificationAddress.hashCode()
         result = 31 * result + paymentType.hashCode()
+        result = 31 * result + persistAfterDeath.hashCode()
         result = 31 * result + senderReference.hashCode()
         result = 31 * result + recipient.hashCode()
         result = 31 * result + vs.hashCode()
@@ -115,6 +119,7 @@ private constructor(
         private var notificationType: NotificationType? = null
         private var notificationAddress: NotificationAddress? = null
         private var paymentType: PaymentType? = null
+        private var persistAfterDeath: Boolean? = null
         private var senderReference: SenderReference? = null
         private var recipient: Recipient? = null
         private var vs: VS? = null
@@ -148,6 +153,8 @@ private constructor(
             }
 
         public fun paymentType(paymentType: PaymentType): Builder = apply { this.paymentType = paymentType }
+
+        public fun persistAfterDeath(shouldPersist: Boolean): Builder = apply { this.persistAfterDeath = shouldPersist }
 
         public fun senderReference(senderReference: SenderReference): Builder = apply {
             this.senderReference = senderReference
@@ -186,6 +193,7 @@ private constructor(
                 notificationType = notificationType,
                 notificationAddress = notificationAddress,
                 paymentType = paymentType,
+                persistAfterDeath = persistAfterDeath,
                 senderReference = senderReference,
                 recipient = recipient,
                 vs = vs,
@@ -229,6 +237,7 @@ private constructor(
                 parts.add("NTA" to spayd.notificationAddress.encode(optimizeForQr))
             }
             if (spayd.paymentType != null) parts.add("PT" to spayd.paymentType.encode())
+            if (spayd.persistAfterDeath != null) parts.add("DH" to spayd.persistAfterDeath.encodeDh())
             if (spayd.senderReference != null) parts.add("RF" to spayd.senderReference.encode(optimizeForQr))
             if (spayd.recipient != null) parts.add("RN" to spayd.recipient.encode(optimizeForQr))
             if (spayd.vs != null) parts.add("X-VS" to spayd.vs.encode())
@@ -256,6 +265,8 @@ private constructor(
         }
 
         private inline fun Amount.encode(): String = value
+
+        private inline fun Boolean.encodeDh(): String = if (this) "1" else "0"
 
         private inline fun Currency.encode(): String = code.uppercase()
 
@@ -861,7 +872,7 @@ public data class CustomAttribute private constructor(val key: String, val value
 private data class ParsedSpaydEntry(val index: Int, val key: String, val percentDecodedValue: String) {
     companion object {
         private val predefinedKeys =
-            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
+            setOf("ACC", "ALT-ACC", "AM", "CC", "CRC32", "DH", "DT", "MSG", "NT", "NTA", "PT", "RF", "RN")
 
         private fun requireValidKey(key: String, index: Int, logger: Logger?): String {
             if (key in predefinedKeys) return key
@@ -899,6 +910,15 @@ private data class ParsedSpaydEntry(val index: Int, val key: String, val percent
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun String.isCustomKey() = startsWith("X-") && this !in CustomAttribute.reservedKeys
+
+@Suppress("NOTHING_TO_INLINE")
+private inline fun String.persistAfterDeath(): Boolean =
+    when (this) {
+        "1" -> true
+        "0",
+        "" -> false
+        else -> throw SpaydException("DH: Invalid value. Must be one of [0, 1].")
+    }
 
 @Throws(SpaydException::class)
 private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
@@ -956,6 +976,7 @@ private fun decodeSpayd(spayd: String, logger: Logger?): Spayd {
             "AM" -> result.amount(Amount.fromString(value))
             "CC" -> result.currency(Currency.fromString(value))
             "CRC32" -> receivedCrc32 = value
+            "DH" -> result.persistAfterDeath(value.persistAfterDeath())
             "DT" -> result.dueDate(LocalDate.fromString(value))
             "MSG" -> result.message(Message.fromString(value))
             "NT" -> receivedNt = value
